@@ -46,8 +46,8 @@ export class SSAOScene implements CreateSceneClass {
         // Create SSAO and configure all properties (for the example)
         var ratios = {
             ssaoRatio: 0.5, // Ratio of the SSAO post-process, in a lower resolution
-            combineRatio: 1.0 // Ratio of the combine post-process (combines the SSAO and the scene)
-
+            combineRatio: 1.0, // Ratio of the combine post-process (combines the SSAO and the scene)
+            ssdoRatio: 0.5
         };
 
         var depthTexture = scene.enableDepthRenderer().getDepthMap(); // Force depth renderer "on"
@@ -102,14 +102,14 @@ export class SSAOScene implements CreateSceneClass {
         //     scene.getEngine(),
         //     false,
         // );
-        var ssdoPostProcess = new BABYLON.PostProcess("occlusion", "ssdo",
+        var ssdoPostProcess = new BABYLON.PostProcess("occlusion", "base",
         [
             "sampleSphere", "samplesFactor", "randTextureTiles", "totalStrength", "radius",
             "area", "fallOff", "base", "range", "viewport"
         ],
         ["randomSampler"],
             ratios.ssaoRatio,
-            camera,
+            null,
             BABYLON.Texture.BILINEAR_SAMPLINGMODE,
             scene.getEngine(),
             false,
@@ -133,8 +133,32 @@ export class SSAOScene implements CreateSceneClass {
             effect.setTexture("randomSampler", randomTexture);
         };
 
-        // // Attach camera to the SSAO render pipeline
-        // scene.postProcessRenderPipelineManager.attachCamerasToRenderPipeline("ssao", camera);
+
+        var ssao = new BABYLON.SSAORenderingPipeline("ssao", scene, ratios.ssaoRatio, camera._cameraRigParams);
+        // console.log(ssao.isSupported);
+        
+        // var lightRadius = 0.01;
+
+        
+        // var ssdoEffect = new BABYLON.PostProcess("ssdoEffect", "ssdo2",
+        // [],
+        // [],
+        // ratios.ssdoRatio,
+        // null,
+        // BABYLON.Texture.BILINEAR_SAMPLINGMODE,
+        // engine);
+
+
+
+        // ssdoEffect.onApply = function (effect){
+
+            
+        //     effect.setTexture("textureSampler", depthTexture);
+        // }
+        // ssao.addEffect(new BABYLON.PostProcessRenderEffect(engine, "ssdo2",() => ssdoEffect, true));
+
+        // // // Attach camera to the SSAO render pipeline
+        scene.postProcessRenderPipelineManager.attachCamerasToRenderPipeline("ssao", camera);
 
         // // Manage SSAO
         // var isAttached = true;

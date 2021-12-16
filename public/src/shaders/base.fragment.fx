@@ -8,7 +8,8 @@ uniform sampler2D textureSampler;
  
  
 void main(void) {
- 
-    gl_FragColor = texture2D(textureSampler, vUV) + vec4(0.5);
+    float depthTest = texture2D(textureSampler, vUV).r * 100.0;
+    gl_FragColor = vec4(depthTest, depthTest, depthTest, 1);
+    // gl_FragColor = texture2D(textureSampler, vUV);
  
 }
