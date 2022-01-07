@@ -1,9 +1,6 @@
 
 import { CreateSceneClass } from "../createScene";
 import * as BABYLON from 'babylonjs';
-import { myRenderPipeline } from "../pipelines/myRenderPipeline";
-import { PostProcess, Vector3, Vector2 } from "babylonjs";
-import "../shaders/ssdo.fragment.fx";
 
 
 export class TestScene implements CreateSceneClass {
@@ -50,67 +47,13 @@ export class TestScene implements CreateSceneClass {
             scene
         );
 
-        //Create a pipeline
-
-        // var postProcess = new BlackAndWhitePostProcess("bandw", 1.0, camera);
-        // var kernel = 256.0;	
-        // var postProcess2 = new BlurPostProcess("Horizontal blur", new Vector2(1.0, 0), kernel, 0.25, camera);
-
-        // var pipeline = new BABYLON.PostProcessRenderPil
-
-        //var depth = scene.enableDepthRenderer();
-
-
-
-        // var ssaoRatio = {
-        //     ssaoRatio: 0.5, // Ratio of the SSAO post-process, in a lower resolution
-        //     combineRatio: 1.0 // Ratio of the combine post-process (combines the SSAO and the scene)
-        // };
-
-
-        // var ssao = new BABYLON.SSAORenderingPipeline("ssao", scene, ssaoRatio);
-        // ssao.fallOff = 0.00001;
-        // ssao.area = 1;
-        // ssao.radius = 0.0001;
-        // ssao.totalStrength = 1.0;
-        // ssao.base = 0.5;
-
-        // // Attach camera to the SSAO render pipeline
-        // scene.postProcessRenderPipelineManager.attachCamerasToRenderPipeline("ssao", camera);
-
-        // // Manage SSAO
-        // var isAttached = true;
-        // window.addEventListener("keydown", function (evt) {
-        //     // draw SSAO with scene when pressed "1"
-        //     if (evt.keyCode === 49) {
-        //         if (!isAttached) {
-        //             isAttached = true;
-        //             scene.postProcessRenderPipelineManager.attachCamerasToRenderPipeline("ssao", camera);
-        //         }
-        //         scene.postProcessRenderPipelineManager.enableEffectInPipeline("ssao", ssao.SSAOCombineRenderEffect, camera);
-        //     }
-        //     // draw without SSAO when pressed "2"
-        //     else if (evt.keyCode === 50) {
-        //         isAttached = false;
-        //         scene.postProcessRenderPipelineManager.detachCamerasFromRenderPipeline("ssao", camera);
-        //     }
-        //     // draw only SSAO when pressed "2"
-        //     else if (evt.keyCode === 51) {
-        //         if (!isAttached) {
-        //             isAttached = true;
-        //             scene.postProcessRenderPipelineManager.attachCamerasToRenderPipeline("ssao", camera);
-        //         }
-        //         scene.postProcessRenderPipelineManager.disableEffectInPipeline("ssao", ssao.SSAOCombineRenderEffect, camera);
-        //     }
-        //});
-
         //RENDER PIPELINE
         // var mySSDORenderPipeline = new BABYLON.PostProcessRenderPipeline(engine, "ssdo");
         var combineRatio = 1.0;
 
         //#region 1. GENERATE BUFFER WITH DEPTH, POS, N, ALBEDO
         scene.getEngine()._gl.clearDepth(0.0);
-        var depthTexture = scene.enableDepthRenderer().getDepthMap().getInternalTexture(); // Force depth renderer "on"
+        var depthTexture = scene.enableDepthRenderer().getDepthMap(); // Force depth renderer "on"
 
         var gBufferPostProcess = new BABYLON.PassPostProcess("gBufferPostProcess", combineRatio, camera, BABYLON.Texture.TRILINEAR_SAMPLINGMODE, engine);
 
@@ -120,11 +63,11 @@ export class TestScene implements CreateSceneClass {
 
         //Kernel quality: 8 samples
         var numSamples = 16;
-        var samplesFactor = 1.0/ numSamples;
+        var samplesFactor = 1.0 / numSamples;
         //var randomSampleValue = BABYLON.Scalar.RandomRange(0, 1);
         var kernelSphere = new BABYLON.SmartArray(16);
         //radius around the analyzed pixel. Default: 0.0006
-        var radius = 0.0006;
+        var radius = 0.006;
         // Default: 0.0075;
         var area = 0.0075;
         /**
@@ -140,14 +83,14 @@ export class TestScene implements CreateSceneClass {
 
         //This section is simplified in the babylonjs code
         for (let index = 0; index < numSamples; index++) {
-            var sample = new Vector3(
+            var sample = new BABYLON.Vector3(
                 Math.random() * 2.0 - 1.0,
                 Math.random() * 2.0 - 1.0,
                 Math.random());
             sample.normalize();
             var scale = index / numSamples;
             //improve distribution
-            BABYLON.Scalar.Lerp(0.1, 1.0, scale * scale);
+            scale = BABYLON.Scalar.Lerp(0.1, 1.0, scale * scale);
             sample.scale(scale);
             //sample.scale(BABYLON.Scalar.RandomRange(0, 1));
             kernelSphere.push(sample);
@@ -159,9 +102,8 @@ export class TestScene implements CreateSceneClass {
 
 
         BABYLON.Effect.ShadersStore["customFragmentShader"] = `
-        #ifdef GL_ES
-            precision highp float;
-        #endif
+        precision highp float;
+    
     
         // Samplers
         varying vec2 vUV;
@@ -181,14 +123,41 @@ export class TestScene implements CreateSceneClass {
         uniform float base;
 
 
-        vec3 normalFromDepth(vec2 coords, float depth){
-            vec2 offset1 = vec2(0.0, radius);
-	        vec2 offset2 = vec2(radius, 0.0);
-            float depth1 = texture2D(textureSampler, coords + offset1).r;
-	        float depth2 = texture2D(textureSampler, coords + offset2).r;
+        // matrices
+        uniform mat4 view;
+        uniform mat4 projection;
 
-            vec3 p1 = vec3(offset1, depth1 - depth);
-            vec3 p2 = vec3(offset2, depth2 - depth);
+
+        vec3 reconstructPosition(vec2 coords, float depth, mat4 inverseVP){
+            float x = coords.x * 2.0 - 1.0;
+            float y = (1.0 - coords.y) * 2.0 - 1.0;
+            vec4 position_s = vec4(x, y, depth, 1.0);
+            vec4 position_v = inverseVP * position_s;
+            return position_v.xyz / position_v.w;
+
+        }
+
+        vec3 normalFromDepth(vec2 coords, float depth){
+            // vec2 offset1 = vec2(0.0, radius);
+	        // vec2 offset2 = vec2(radius, 0.0);
+            // float depth1 = texture2D(textureSampler, coords + offset1).r;
+	        // float depth2 = texture2D(textureSampler, coords + offset2).r;
+
+            // vec3 p1 = vec3(offset1, depth1 - depth);
+            // vec3 p2 = vec3(offset2, depth2 - depth);
+
+            // vec3 normal = cross(p1, p2);
+            // normal.z = -normal.z;
+
+            vec2 offset1 = coords + vec2(0.0, radius);
+	        vec2 offset2 = coords + vec2(radius, 0.0);
+            float depth1 = texture2D(textureSampler, offset1).r;
+	        float depth2 = texture2D(textureSampler, offset2).r;
+
+            mat4 inverseVP = inverse(projection * view);
+
+            vec3 p1 = reconstructPosition(offset1, depth1 - depth, inverseVP);
+            vec3 p2 = reconstructPosition(offset2, depth2 - depth, inverseVP);
 
             vec3 normal = cross(p1, p2);
             normal.z = -normal.z;
@@ -206,7 +175,7 @@ export class TestScene implements CreateSceneClass {
             
             float depth = texture2D(textureSampler, vUV).r;
             vec3 fragPos = vec3(vUV, depth);
-            vec3 fragN = normalFromDepth(vUV, depth);
+            vec3 fragN = normalFromDepth(vUV, depth * 10.0);
             vec3 randomVec = normalize(texture2D(randomSampler, vUV * randTextureTiles).rgb);
             
             //to scale it right?
@@ -219,7 +188,7 @@ export class TestScene implements CreateSceneClass {
             vec3 hemiRay;
             float occlusionDepth;
             float difference;
-            depth = depth * 1000.0;
+            // depth = depth * 1000.0;
             
             for (int i = 0; i < 16; i++){
                 ray = radiusDepth * reflect(kernelSphere[i], randomVec);
@@ -230,14 +199,16 @@ export class TestScene implements CreateSceneClass {
                 //range check
                 occlusion += step(fallOff, difference) * (1.0 - smoothstep(fallOff, area, difference));
             }
-            //ao contribution of sample fromm all samples
+            //ao contribution of sample from all samples
             float ao = 1.0 - totalStrength * occlusion * samplesFactor;
 	        float result = clamp(ao + base, 0.0, 1.0);
 
             gl_FragColor.rgb = vec3(result);
             gl_FragColor.a = 1.0;
 
-            // gl_FragColor = texture2D(textureSampler, vUV) * vec4(1000);
+            // To check if shader is being loaded uncomment this line
+            gl_FragColor = texture2D(textureSampler, vUV) * vec4(1000);
+            // gl_FragColor = vec4(fragN, 1.0);
         }
         `;
 
@@ -249,7 +220,8 @@ export class TestScene implements CreateSceneClass {
             BABYLON.Texture.BILINEAR_SAMPLINGMODE,
             scene.getEngine(),
             false,
-            );
+        );
+
 
         //postProcess.externalTextureSamplerBinding
         postProcess.onApply = function (effect) {
@@ -264,67 +236,67 @@ export class TestScene implements CreateSceneClass {
             effect.setFloat("totalStrength", totalStrength);
             effect.setFloat("base", base);
 
-            effect._bindTexture("textureSampler", depthTexture);
+            effect.setTexture("textureSampler", depthTexture);
             effect.setTexture("randomSampler", noiseTexture);
-        };    
-   
-         //#endregion
-        
+        };
+
+        //#endregion
+
         //#region 3. BLUR
 
-        var blurSize = 16;
-        var blurRatio = 0.5;
-        var blurHPostProcess = new BABYLON.BlurPostProcess("blurH", new Vector2(1, 0), blurSize, blurRatio, camera, BABYLON.Texture.BILINEAR_SAMPLINGMODE);
-        var blurVPostProcess = new BABYLON.BlurPostProcess("blurV", new Vector2(0, 1), blurSize, blurRatio, camera, BABYLON.Texture.BILINEAR_SAMPLINGMODE);
+        // var blurSize = 16;
+        // var blurRatio = 0.5;
+        // var blurHPostProcess = new BABYLON.BlurPostProcess("blurH", new Vector2(1, 0), blurSize, blurRatio, camera, BABYLON.Texture.BILINEAR_SAMPLINGMODE);
+        // var blurVPostProcess = new BABYLON.BlurPostProcess("blurV", new Vector2(0, 1), blurSize, blurRatio, camera, BABYLON.Texture.BILINEAR_SAMPLINGMODE);
 
-        blurHPostProcess.onActivateObservable.add(() => {
-            let dw = blurHPostProcess.width / scene.getEngine().getRenderWidth();
-            blurHPostProcess.kernel = blurSize * dw;
-        });
-        blurVPostProcess.onActivateObservable.add(() => {
-            let dw = blurHPostProcess.height / scene.getEngine().getRenderHeight();
-            blurHPostProcess.kernel = blurSize * dw;
-        });
+        // blurHPostProcess.onActivateObservable.add(() => {
+        //     let dw = blurHPostProcess.width / scene.getEngine().getRenderWidth();
+        //     blurHPostProcess.kernel = blurSize * dw;
+        // });
+        // blurVPostProcess.onActivateObservable.add(() => {
+        //     let dw = blurHPostProcess.height / scene.getEngine().getRenderHeight();
+        //     blurHPostProcess.kernel = blurSize * dw;
+        // });
         //#endregion
-        
+
         //#region 4. COMBINE IMAGE
 
-        var combineRatio = 1.0;
+        // var combineRatio = 1.0;
 
 
-        BABYLON.Effect.ShadersStore["combineFragmentShader"] = `
-        #ifdef GL_ES
-            precision highp float;
-        #endif
-    
-        // Samplers
-        varying vec2 vUV;
-        uniform sampler2D textureSampler;
-        uniform sampler2D originalColor;
+        // BABYLON.Effect.ShadersStore["combineFragmentShader"] = `
+        // #ifdef GL_ES
+        //     precision highp float;
+        // #endif
 
-        uniform vec4 viewport;
+        // // Samplers
+        // varying vec2 vUV;
+        // uniform sampler2D textureSampler;
+        // uniform sampler2D originalColor;
 
-        void main(void){
-            vec4 ssaoColor = texture2D(textureSampler, viewport.xy + vUV * viewport.zw);
-            vec4 sceneColor = texture2D(originalColor, vUV);
+        // uniform vec4 viewport;
 
-            gl_FragColor = sceneColor * ssaoColor;
-        }
+        // void main(void){
+        //     vec4 ssaoColor = texture2D(textureSampler, viewport.xy + vUV * viewport.zw);
+        //     vec4 sceneColor = texture2D(originalColor, vUV);
 
-        `;
-        var combinePostProcess = new BABYLON.PostProcess("combine", "combine",
-        [],
-        ["originalColor", "viewport"],
-        combineRatio,
-        camera,
-        BABYLON.Texture.BILINEAR_SAMPLINGMODE,
-        scene.getEngine(),
-        false);
-        
-        combinePostProcess.onApply = function (effect) {
-            effect.setTextureFromPostProcess("originalColor", gBufferPostProcess);
-            effect.setVector4("viewport", BABYLON.TmpVectors.Vector4[0].copyFromFloats(0, 0, 1.0, 1.0));
-        }
+        //     gl_FragColor = sceneColor * ssaoColor;
+        // }
+
+        // `;
+        // var combinePostProcess = new BABYLON.PostProcess("combine", "combine",
+        // [],
+        // ["originalColor", "viewport"],
+        // combineRatio,
+        // camera,
+        // BABYLON.Texture.BILINEAR_SAMPLINGMODE,
+        // scene.getEngine(),
+        // false);
+
+        // combinePostProcess.onApply = function (effect) {
+        //     effect.setTextureFromPostProcess("originalColor", gBufferPostProcess);
+        //     effect.setVector4("viewport", BABYLON.TmpVectors.Vector4[0].copyFromFloats(0, 0, 1.0, 1.0));
+        // }
         //#endregion
 
         // postProcess.onApply = function (effect) {   };
@@ -346,7 +318,7 @@ export class TestScene implements CreateSceneClass {
 
         var context = noiseTexture.getContext();
 
-        var noiseVector = Vector3.Zero();
+        var noiseVector = BABYLON.Vector3.Zero();
         for (let x = 0; x < size; x++) {
             for (let y = 0; y < size; y++) {
                 noiseVector.x = Math.floor((Math.random() * 2.0 - 1.0) * 255);
