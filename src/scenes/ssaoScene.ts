@@ -1,9 +1,8 @@
 import { CreateSceneClass } from "../createScene";
 import * as BABYLON from 'babylonjs';
-import { CustomSSAORenderingPipeline } from "../pipelines/CustomSSAORenringPipeline";
 import "./shaders/base.fragment.fx"
 import "./shaders/ssao.fragment.fx"
-import "./shaders/ssdo.fragment.fx"
+// import "./shaders/ssdo.fragment.fx"
 
 export class SSAOScene implements CreateSceneClass {
 
@@ -43,17 +42,17 @@ export class SSAOScene implements CreateSceneClass {
         var dirLight = new BABYLON.DirectionalLight("dirLight", new BABYLON.Vector3(0, -1, -1), scene);
         // scene.ambientColor = new BABYLON.Color3(0.9, 1, 1);
 
-        // Create SSAO and configure all properties (for the example)
         var ratios = {
-            ssaoRatio: 0.5, // Ratio of the SSAO post-process, in a lower resolution
-            combineRatio: 1.0, // Ratio of the combine post-process (combines the SSAO and the scene)
+            ssaoRatio: 0.5, 
+            combineRatio: 1.0,
             ssdoRatio: 0.5
         };
 
+        // preSSAO variables
         var depthTexture = scene.enableDepthRenderer().getDepthMap(); // Force depth renderer "on"
         var gBufferPostProcess = new BABYLON.PassPostProcess("gBufferPostProcess", ratios.ssaoRatio, camera, BABYLON.Texture.TRILINEAR_SAMPLINGMODE, engine);
 
-
+        // SSAO variables
         var firstUpdate = true;
         var ssaoFallOff = 0.000001;
         var ssaoArea = 0.0075;
@@ -62,6 +61,8 @@ export class SSAOScene implements CreateSceneClass {
         var ssaoBase = 0.5;
         var numSamples = 16;
         var samplesFactor = 1.0 / numSamples;
+
+        //Generate random dome
         // var kernelSphere = new BABYLON.SmartArray(16);
         // for (let index = 0; index < numSamples; index++) {
         //     var sample = new BABYLON.Vector3(
@@ -77,6 +78,8 @@ export class SSAOScene implements CreateSceneClass {
         //     kernelSphere.push(sample);
         // }
         // var kernelSphereData = kernelSphere.data.map(Number);
+
+        
         var kernelSphereData = [
             0.5381, 0.1856, -0.4319,
             0.1379, 0.2486, 0.4430,
@@ -102,18 +105,22 @@ export class SSAOScene implements CreateSceneClass {
         //     scene.getEngine(),
         //     false,
         // );
-        var ssdoPostProcess = new BABYLON.PostProcess("occlusion", "base",
+
+
+        // 
+        var ssdoPostProcess = new BABYLON.PostProcess("occlusion", "ssao",
         [
             "sampleSphere", "samplesFactor", "randTextureTiles", "totalStrength", "radius",
             "area", "fallOff", "base", "range", "viewport"
         ],
         ["randomSampler"],
             ratios.ssaoRatio,
-            null,
+            camera,
             BABYLON.Texture.BILINEAR_SAMPLINGMODE,
             scene.getEngine(),
             false,
         );
+        
         ssdoPostProcess.restoreDefaultInputTexture();
         ssdoPostProcess.onApply = function (effect) {
             if (firstUpdate) {

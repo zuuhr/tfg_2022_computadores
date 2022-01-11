@@ -53,7 +53,7 @@ export class TestScene implements CreateSceneClass {
 
         //#region 1. GENERATE BUFFER WITH DEPTH, POS, N, ALBEDO
         scene.getEngine()._gl.clearDepth(0.0);
-        var depthTexture = scene.enableDepthRenderer().getDepthMap(); // Force depth renderer "on"
+        var depthTexture = scene.enableDepthRenderer(camera, true).getDepthMap(); // Force depth renderer "on"
 
         var gBufferPostProcess = new BABYLON.PassPostProcess("gBufferPostProcess", combineRatio, camera, BABYLON.Texture.TRILINEAR_SAMPLINGMODE, engine);
 
@@ -138,41 +138,32 @@ export class TestScene implements CreateSceneClass {
         }
 
         vec3 normalFromDepth(vec2 coords, float depth){
-            // vec2 offset1 = vec2(0.0, radius);
-	        // vec2 offset2 = vec2(radius, 0.0);
-            // float depth1 = texture2D(textureSampler, coords + offset1).r;
-	        // float depth2 = texture2D(textureSampler, coords + offset2).r;
-
-            // vec3 p1 = vec3(offset1, depth1 - depth);
-            // vec3 p2 = vec3(offset2, depth2 - depth);
-
-            // vec3 normal = cross(p1, p2);
-            // normal.z = -normal.z;
-
             vec2 offset1 = coords + vec2(0.0, radius);
 	        vec2 offset2 = coords + vec2(radius, 0.0);
             float depth1 = texture2D(textureSampler, offset1).r;
 	        float depth2 = texture2D(textureSampler, offset2).r;
 
-            mat4 inverseVP = inverse(projection * view);
-
-            vec3 p1 = reconstructPosition(offset1, depth1 - depth, inverseVP);
-            vec3 p2 = reconstructPosition(offset2, depth2 - depth, inverseVP);
+            // original
+            vec3 p1 = vec3(offset1, depth1 - depth);
+            vec3 p2 = vec3(offset2, depth2 - depth);
 
             vec3 normal = cross(p1, p2);
             normal.z = -normal.z;
 
+            //different try
+            // mat4 inverseVP = inverse(projection * view);
+            // vec3 p1 = reconstructPosition(offset1, depth1 - depth, inverseVP);
+            // vec3 p2 = reconstructPosition(offset2, depth2 - depth, inverseVP);
+
+            // vec3 normal = cross(p1, p2);
+            // normal.z = -normal.z;
+
             return normalize(normal);
+
         }
 
         void main(void) 
         {
-            // //depth buffer check
-            // float depthTest = texture2D(textureSampler, vUV).r * 1000.0;
-            // gl_FragColor = vec4(depthTest, depthTest, depthTest, 1);
-
-            //gl_FragColor = normalize(texture2D(textureSampler, vUV));
-            
             float depth = texture2D(textureSampler, vUV).r;
             vec3 fragPos = vec3(vUV, depth);
             vec3 fragN = normalFromDepth(vUV, depth * 10.0);
@@ -207,8 +198,8 @@ export class TestScene implements CreateSceneClass {
             gl_FragColor.a = 1.0;
 
             // To check if shader is being loaded uncomment this line
-            gl_FragColor = texture2D(textureSampler, vUV) * vec4(1000);
-            // gl_FragColor = vec4(fragN, 1.0);
+            // gl_FragColor = texture2D(textureSampler, vUV) * vec4(1000);
+            gl_FragColor = vec4(fragN, 1.0);
         }
         `;
 
@@ -219,7 +210,7 @@ export class TestScene implements CreateSceneClass {
             camera,
             BABYLON.Texture.BILINEAR_SAMPLINGMODE,
             scene.getEngine(),
-            false,
+            false
         );
 
 
