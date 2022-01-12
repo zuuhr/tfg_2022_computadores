@@ -26,8 +26,15 @@ export class NormalScene implements CreateSceneClass {
         var boxes: BABYLON.Mesh[] = [];
 
         var sphere = BABYLON.Mesh.CreateSphere("sphere", 5, 20, scene);
-        sphere.position = new BABYLON.Vector3(0, 2.5, 10);
+        sphere.position = new BABYLON.Vector3(0, 2.5, 20);
         boxes.push(sphere);
+        var angle = 0.02;
+        var pivot = new BABYLON.TransformNode("root");
+        sphere.parent = pivot;
+        scene.registerAfterRender(function () { 
+	        sphere.rotate(new BABYLON.Vector3(0,1,0), angle, BABYLON.Space.WORLD);
+	        pivot.rotate(new BABYLON.Vector3(0,1,0), angle, BABYLON.Space.WORLD);
+        });    
 
         var numBoxes = 2;
         for (var i = 0; i < numBoxes; i++) {
@@ -86,17 +93,22 @@ export class NormalScene implements CreateSceneClass {
         uniform sampler2D textureSampler;
         uniform sampler2D normalTexture;
         uniform mat4 worldViewProjection;
+        uniform mat4 worldView;
         uniform mat4 view;
+        uniform mat4 world;
         
         //Varying
         varying vec2 vUV;
         varying vec3 vNormal;
 
         void main(void){
+            //AQUI EL FALLO
+            //model space normal
             vec4 normal = vec4(vNormal, 1);
-            vec4 SP_Normal = worldViewProjection * normal;
-            SP_Normal = view * normal;
+            //world space normal (world matrix is model matrix on unity)
+            vec4 SP_Normal = world * normal;
             gl_FragColor = SP_Normal;
+            
             // gl_FragColor = texture2D(textureSampler, vUV);
         }
         `;
@@ -107,7 +119,7 @@ export class NormalScene implements CreateSceneClass {
             'normalTexture',
             {
                 attributes:['position', 'normal', 'uv'],
-                uniforms: ['worldViewProjection', 'view']
+                uniforms: ['worldViewProjection', 'view', 'worldView', 'world']
             }
         );
 
@@ -122,7 +134,7 @@ export class NormalScene implements CreateSceneClass {
 
         normalRenderTarget.setMaterialForRendering(boxes, normalTextureMaterial);
 
-        //continue from here https://playground.babylonjs.com/#TG2B18#60
+        
 
         //post process shader
 
@@ -160,7 +172,7 @@ export class NormalScene implements CreateSceneClass {
         
         // normalRenderTarget.getCustomRenderList(0, boxes, numBoxes * numBoxes);
         
-
+        // I left where nromasl must be transformed into view space
         return scene;
 
     };
