@@ -32,8 +32,8 @@ export class NormalScene implements CreateSceneClass {
         var pivot = new BABYLON.TransformNode("root");
         sphere.parent = pivot;
         scene.registerAfterRender(function () { 
-	        sphere.rotate(new BABYLON.Vector3(0,1,0), angle, BABYLON.Space.WORLD);
-	        pivot.rotate(new BABYLON.Vector3(0,1,0), angle, BABYLON.Space.WORLD);
+	        // sphere.rotate(new BABYLON.Vector3(0,1,0), angle, BABYLON.Space.WORLD);
+	        // pivot.rotate(new BABYLON.Vector3(0,1,0), angle, BABYLON.Space.WORLD);
         });    
 
         var numBoxes = 2;
@@ -100,14 +100,18 @@ export class NormalScene implements CreateSceneClass {
         //Varying
         varying vec2 vUV;
         varying vec3 vNormal;
+        varying vec4 vPosition;
 
         void main(void){
             //AQUI EL FALLO
             //model space normal
             vec4 normal = vec4(vNormal, 1);
             //world space normal (world matrix is model matrix on unity)
-            vec4 SP_Normal = world * normal;
+            vec4 SP_Normal = transpose(inverse(worldView)) * normal;  //NO SE ME VUELVE A OLVIDAR 
             gl_FragColor = SP_Normal;
+            //Fin Normal 
+
+            // gl_FragColor = worldView * vPosition;
             
             // gl_FragColor = texture2D(textureSampler, vUV);
         }
@@ -137,6 +141,34 @@ export class NormalScene implements CreateSceneClass {
         
 
         //post process shader
+        var numSamples = 16;
+        var samplesFactor = 1.0 / numSamples;
+        var kernelSphere = new BABYLON.SmartArray(16);
+        //radius around the analyzed pixel. Default: 0.0006
+        var radius = 0.006;
+        // Default: 0.0075;
+        var area = 0.0075;
+        var fallOff = 0.000001;
+        //base color of SSAO
+        var base = 0.5;
+        //max value of SSAO
+        var totalStrength = 1.0;
+        for (let index = 0; index < numSamples; index++) {
+            var sample = new BABYLON.Vector3(
+                Math.random() * 2.0 - 1.0,
+                Math.random() * 2.0 - 1.0,
+                Math.random());
+            sample.normalize();
+            var scale = index / numSamples;
+            //improve distribution
+            scale = BABYLON.Scalar.Lerp(0.1, 1.0, scale * scale);
+            sample.scale(scale);
+            //sample.scale(BABYLON.Scalar.RandomRange(0, 1));
+            kernelSphere.push(sample);
+        }
+        var kernelSphereData = kernelSphere.data.map(Number);
+        //noise texture
+        var noiseTexture = this._generateNoiseTexture(scene);
 
         BABYLON.Effect.ShadersStore.normalPostProcessFragmentShader = `
         precision highp float;
@@ -176,6 +208,29 @@ export class NormalScene implements CreateSceneClass {
         return scene;
 
     };
+
+    private _generateNoiseTexture(scene: BABYLON.Scene): BABYLON.DynamicTexture {
+        var size = 512;
+        var noiseTexture = new BABYLON.DynamicTexture("noiseTexture", size, scene, false, BABYLON.Texture.TRILINEAR_SAMPLINGMODE);
+        noiseTexture.wrapU = BABYLON.Texture.WRAP_ADDRESSMODE;
+        noiseTexture.wrapV = BABYLON.Texture.WRAP_ADDRESSMODE;
+
+        var context = noiseTexture.getContext();
+
+        var noiseVector = BABYLON.Vector3.Zero();
+        for (let x = 0; x < size; x++) {
+            for (let y = 0; y < size; y++) {
+                noiseVector.x = Math.floor((Math.random() * 2.0 - 1.0) * 255);
+                noiseVector.y = Math.floor((Math.random() * 2.0 - 1.0) * 255);
+                noiseVector.z = Math.floor((Math.random() * 2.0 - 1.0) * 255);
+
+                context.fillStyle = 'rgb(' + noiseVector.x + ', ' + noiseVector.y + ', ' + noiseVector.z + ')';
+                context.fillRect(x, y, 1, 1);
+            }
+        }
+
+        return noiseTexture;
+    }
 }
 
 export default new NormalScene();
