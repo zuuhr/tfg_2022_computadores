@@ -159,7 +159,7 @@ export class NormalScene implements CreateSceneClass {
             var sample = new BABYLON.Vector3(
                 Math.random() * 2.0 - 1.0,
                 Math.random() * 2.0 - 1.0,
-                - Math.random());
+                Math.random());
             sample.normalize();
             var scale = index / numSamples;
             //improve distribution
@@ -188,7 +188,7 @@ export class NormalScene implements CreateSceneClass {
         //noise texture
         // var noiseTexture = this._generateNoiseTexture(scene);
         // var noiseTexture = new BABYLON.Texture("https://imgur.com/BJwNGuo", scene);
-        var noiseTexture = new BABYLON.Texture("WhiteNoiseDithering.png", scene);
+        var noiseTexture = new BABYLON.Texture("Noise.png", scene);
         noiseTexture.wrapU = BABYLON.Texture.WRAP_ADDRESSMODE;
         noiseTexture.wrapV = BABYLON.Texture.WRAP_ADDRESSMODE;
         var depthTexture = scene.enableDepthRenderer(camera, false).getDepthMap(); //false to get linear depht, true to get logarithmic depth
@@ -197,6 +197,7 @@ export class NormalScene implements CreateSceneClass {
         precision highp float;
         
         varying vec2 vUV;
+        varying vec4 vPosition;
         
         uniform sampler2D textureSampler;
         uniform sampler2D normalTexture;
@@ -209,15 +210,25 @@ export class NormalScene implements CreateSceneClass {
         uniform float fallOff;
         uniform float area;
 
+        uniform mat4 projection; 
+        uniform mat4 view; 
+
+        vec3 getRandomVec3(vec2 uv){
+            return normalize( 
+                vec3( texture2D(noiseTexture, uv).rg * 2.0 - 1.0,
+                0.0) 
+            );
+        }
 
         void main(void){
             float depth = texture2D(depthTexture, vUV).r;
-            vec3 fragPos = vec3(vUV, depth); //aint this screen coordinates?
+            vec3 fragPos = vec3(vUV, depth); //screen coordinates mirar la escala xy vs z
             vec3 fragN = texture2D(normalTexture, vUV).xyz;
-            vec3 randomVec = normalize(texture2D(noiseTexture, vUV).rgb);
+            // vec3 randomVec = normalize(texture2D(noiseTexture, vUV).rgb);
+            vec3 randomVec = getRandomVec3(vUV); 
 
             //cant remember why
-            float scale = radius / depth;
+            float scale = radius / depth; //este
             scale = radius; 
 
             float ao = 0.0;
@@ -237,23 +248,36 @@ export class NormalScene implements CreateSceneClass {
 
 
                 
-                vec3 samplePosition = fragPos + kernelSphere[i] * scale;
                 
+                //TODO: rotar el kernelSphere -> gotta use TBN matrix 
+                //WHY
+                vec3 tangent = normalize(randomVec - fragN * dot(randomVec, fragN));
+                vec3 binormal = cross(fragN, tangent);
+                //hacer grand schmicth
+                mat3 TBN = mat3(tangent, binormal, fragN);
+
+                vec3 samplePosition =  TBN * kernelSphere[i];
+                samplePosition = fragPos + samplePosition  * scale;
+                //sumar con otro vector posicion en view space worldView * vPosition (mirar shader postprocreso default)
+                
+                // samplePosition *= sign(dot(fragN, samplePosition)); //no hace falta porque ya esta bien colocado kernelsphere
+                // vec4 offset = projection * vec4(samplePosition, 1.0);
 
                 float sampleDepth = samplePosition.z;
-                float actualDepth = texture2D(depthTexture, samplePosition.xy).r;
+                float actualDepth = texture2D(depthTexture, samplePosition.xy).r; //samplePosition screen coordinates
                 float difference = actualDepth - sampleDepth;
 
-                float rangeCheck =  smoothstep(0.0001, 1.0, radius / abs(difference));
+                float rangeCheck =  smoothstep(0.0001, 1.0, radius / abs(difference)); //rehacer
 
                 rangeCheck = abs(actualDepth - depth) < area ? 1.0 : 0.0;
 
-                ao += difference > 0.0001 ? 0.0 : 1.0 * rangeCheck;
+                ao += difference > 0.0001 ? 0.0 : 1.0;
             }
             ao /= float(numSamples);
             ao = 1.0 - ao;
             gl_FragColor = texture2D(normalTexture, vUV);
-            // gl_FragColor = texture2D(depthTexture, vUV);
+            gl_FragColor = texture2D(depthTexture, vUV);
+            // gl_FragColor = vec4(vUV.x, vUV.y, 0.0, 1.0);
             // gl_FragColor = texture2D(noiseTexture, vUV);
             gl_FragColor = vec4(ao, ao, ao, 1);
             // float result = floor(vUV.x * 1000.0 / float(numSamples));
@@ -268,7 +292,7 @@ export class NormalScene implements CreateSceneClass {
         var normalPostProcessPass = new BABYLON.PostProcess(
             'Normal Post Process shader',
             'normalPostProcess',
-            ['radius', 'numSamples', 'kernelSphere', 'fallOff', 'area'],
+            ['radius', 'numSamples', 'kernelSphere', 'fallOff', 'area', 'projection', 'view'],
             ['normalTexture', 'depthTexture', 'noiseTexture'],
             1.0,
             camera,
@@ -286,6 +310,11 @@ export class NormalScene implements CreateSceneClass {
             effect.setTexture("normalTexture", normalRenderTarget);
             effect.setTexture("depthTexture", depthTexture);
             effect.setTexture("noiseTexture", noiseTexture);
+
+            //we need to set uniform matrices in PostProcess shaders
+            effect.setMatrix("projection", camera.getProjectionMatrix(true));
+            effect.setMatrix("view", camera.getViewMatrix(true));
+            //world matrix
         }
 
         
@@ -300,7 +329,7 @@ export class NormalScene implements CreateSceneClass {
         var size = 512;
         var noiseTexture = new BABYLON.DynamicTexture("noiseTexture", size, scene, false, BABYLON.Texture.TRILINEAR_SAMPLINGMODE);
         
-        var context = noiseTexture.getContext();
+        var context = noiseTexture.getContext(); 
         
         var noiseVector = BABYLON.Vector3.Zero();
         for (let x = 0; x < size; x++) {
