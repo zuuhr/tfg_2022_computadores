@@ -235,13 +235,14 @@ export class NormalScene implements CreateSceneClass {
             //Linear depth from texture
             float depth = texture2D(depthTexture, vUV).r;
 
-            //Screen Space Fragment Position (z scale in ss and vs don't vary)
+            //Clip Space Fragment Position (z scale in ss and vs don't vary) screen space (* 2.0 - 1.0) - > clip space
             vec3 fragPos = vec3(vUV * 2.0 - 1.0, depth);
             
-            //View Space Fragment Position
+            //View Space Fragment Position 
             mat4 projectionIN = inverse(projection);
             vec3 VS_fragPos = (projectionIN * vec4(fragPos, 1.0)).xyz;
-            //maybe to readjust add this: VS_fragpos.z = depth;
+            //maybe to readjust add this: 
+            VS_fragPos.z = depth;
                             
             //View Space Normal
             vec3 fragN = normalize(texture2D(normalTexture, vUV).xyz);
@@ -270,32 +271,32 @@ export class NormalScene implements CreateSceneClass {
                 //offset sample position
                 samplePosition = VS_fragPos + samplePosition * scale;
 
-                //this depth is in View Space
+                //samplePos depth in View Space
                 float sampleDepth = samplePosition.z; //Z aleatoria
 
-                //the actual depth: (Screen space) -> (View Space)
-                // float actualDepth = texture2D(depthTexture, samplePosition.xy).r; //samplePosition screen coordinates
                 //view -> (projection) -> clip -> (/ 2.0 + 0.5) -> screen
                 vec2 tempCoord = (projection * vec4(samplePosition, 1.0)).xy / 2.0 + 0.5;
-                //actual Depth
-                float tempDepth = texture2D(depthTexture, tempCoord).r;
-                vec3 SS_tempPos = vec3(tempCoord * 2.0 - 1.0, tempDepth);
-                // float actualDepth = (projectionIN * vec4(SS_tempPos, 1.0)).z;
-                float difference = depth - tempDepth; 
+                //offset Depth is the real depth of the screen fragment at the same xy of samplePosition
+                float offsetDepth = texture2D(depthTexture, tempCoord).r;
+                //difference is comparison of the depth of the sample and the depth at that position 
+                float difference = sampleDepth - (offsetDepth); 
+                // difference = - difference;
 
-                float rangeCheck =  smoothstep(0.0001, 1.0, radius / abs(difference)); //rehacer
+                // float rangeCheck =  smoothstep(0.0001, 1.0, radius / abs(difference)); //rehacer
 
                 // rangeCheck = abs(difference) < area ? 1.0 : 0.0;
 
-                ao += difference + bias > 0.001 ? 1.0 * rangeCheck : 0.0;
-                // ao += sign(difference) > 0.0 ? 1.0 : 0.0;
-                prueba = depth;
+                // ao += difference + bias > 0.001 ? 1.0 * rangeCheck : 0.0;
+                // ao += difference > 0.001 ? 1.0 * rangeCheck : 0.0;
+                ao += difference > 0.0 ? 1.0 : 0.0;
+                // prueba = offsetDepth;
             }
             // prueba /= float(numSamples);
             ao /= float(numSamples);
             ao = 1.0 - ao;
-            gl_FragColor = vec4(fragN, 1);
-            gl_FragColor = vec4(depth, depth, depth, 1);
+
+            // gl_FragColor = vec4(fragN, 1);
+            // gl_FragColor = vec4(depth, depth, depth, 1);
             // gl_FragColor = vec4(prueba, prueba, prueba, 1);
             // gl_FragColor = vec4(depthNDC, depthNDC, depthNDC, 1);
             // gl_FragColor = vec4(depthL, depthL, depthL, 1) ;
