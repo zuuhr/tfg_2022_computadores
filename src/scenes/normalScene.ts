@@ -232,43 +232,38 @@ export class NormalScene implements CreateSceneClass {
         }
         
         void main(void){
-            // From log [0, 1] to linear [-1, 1]
+            //Linear depth from texture
             float depth = texture2D(depthTexture, vUV).r;
-            //NO NEED:
-            //Normalized Device Coordinates
-            // float depthNDC = depth * 2.0 - 1.0;
-            //Linear value
-            // float depthL = (2.0 * near * far) / (far + near - depthNDC * (far - near));	
 
-            //Screen Space Fragment Position
-            vec3 fragPos = vec3(vUV * 2.0 - 1.0, depth); //screen coordinates mirar la escala xy vs z
+            //Screen Space Fragment Position (z scale in ss and vs don't vary)
+            vec3 fragPos = vec3(vUV * 2.0 - 1.0, depth);
             
             //View Space Fragment Position
             mat4 projectionIN = inverse(projection);
             vec3 VS_fragPos = (projectionIN * vec4(fragPos, 1.0)).xyz;
+            //maybe to readjust add this: VS_fragpos.z = depth;
                             
             //View Space Normal
             vec3 fragN = normalize(texture2D(normalTexture, vUV).xyz);
 
-            // float fragNLength = length(fragN);
             //Tangent Space randomVec
             vec3 randomVec = getRandomVec3(vUV); 
 
-            //The further the distance the bigger the radius? 
-            float scale = radius / depth; //este
-            // scale = radius; 
+            //kernelSphere rotated along surface normal -> use TBN matrix 
+            vec3 tangent = normalize(randomVec - fragN * dot(randomVec, fragN));
+            //gram schmidt:
+            tangent = normalize(tangent - fragN * dot(tangent, fragN));
+            vec3 binormal = cross(fragN, tangent);
+            mat3 TBN = mat3(tangent, binormal, fragN);
+
+
+            //The further the distance the bigger the radius in view space 
+            float scale = radius / depth; 
 
             float ao = 0.0;
             float prueba = 0.0;
             for(int i = 0; i < numSamples; i++){
                 
-                //TODO: rotar el kernelSphere -> use TBN matrix 
-                vec3 tangent = normalize(randomVec - fragN * dot(randomVec, fragN));
-                //gram schmidt:
-                tangent = normalize(tangent - fragN * dot(tangent, fragN));
-                vec3 binormal = cross(fragN, tangent);
-                mat3 TBN = mat3(tangent, binormal, fragN);
-
                 //Sample position in view space
                 vec3 samplePosition =  TBN * kernelSphere[i];
 
