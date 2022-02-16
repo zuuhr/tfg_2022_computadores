@@ -290,6 +290,7 @@ export class NormalScene implements CreateSceneClass {
                     //difference is comparison of the depth of the sample and the depth at that position 
                 
                 ////BEGIN [MY CODE]
+                ////comprobar si está ocluido el sample Position
                 // float difference = sampleDepth - offsetDepth; 
                 // float rangeCheck =  smoothstep(0.0, 1.0, scale / abs(difference)); //rehacer
                 // rangeCheck = 1.0 - offsetDepth; //rehacer
@@ -298,6 +299,7 @@ export class NormalScene implements CreateSceneClass {
                 ////END [MY CODE]
 
                 ////BEGIN [GAMEDEV CODE]
+                ////comprobar si la superficie ocluye hacia el fragmento 
                 vec3 VS_offsetPos = vec3(samplePosition.xy, offsetDepth);
                 vec3 diff = VS_offsetPos - VS_fragPos;
                 vec3 v = normalize(diff);
