@@ -15,6 +15,13 @@ export class NormalScene implements CreateSceneClass {
         camera.maxZ = 200; //Tweak to see better xd
         camera.minZ = 0.1;
 
+        //Geometry
+        var planeH = BABYLON.MeshBuilder.CreatePlane("planeH", {height:60, width:60, sideOrientation:2});
+        planeH.lookAt(new BABYLON.Vector3(0,1,0));
+        var planeF = BABYLON.MeshBuilder.CreatePlane("planeF", {height:60, width:60, sideOrientation:2});
+        planeF.lookAt(new BABYLON.Vector3(0,0,-1));
+        var planeR = BABYLON.MeshBuilder.CreatePlane("planeR", {height:60, width:60, sideOrientation:2});
+        planeR.lookAt(new BABYLON.Vector3(1,0,0));
         // Create some boxes and deactivate lighting (specular color and back faces)
         var boxMaterial = new BABYLON.StandardMaterial("boxMaterail", scene);
         boxMaterial.diffuseTexture = new BABYLON.Texture("./ground.jpg", scene);
@@ -30,6 +37,9 @@ export class NormalScene implements CreateSceneClass {
         var sphere = BABYLON.Mesh.CreateSphere("sphere", 5, 20, scene);
         sphere.position = new BABYLON.Vector3(0, 2.5, 20);
         boxes.push(sphere);
+        boxes.push(planeH);
+        boxes.push(planeF);
+        boxes.push(planeR);
         var angle = 0.02;
         var pivot = new BABYLON.TransformNode("root");
         sphere.parent = pivot;
@@ -147,15 +157,12 @@ export class NormalScene implements CreateSceneClass {
 
         //post process shader
         var numSamples = 16;
-        var samplesFactor = 1.0 / numSamples;
         var kernelSphere = new BABYLON.SmartArray(16);
         //radius around the analyzed pixel. Default: 0.0006
-        var radius = 0.006;
-        // Default: 0.0075;
-        var area = 0.0075;
+        var radius = 0.05;
         var fallOff = 0.000001;
         //Bias default: 0.025
-        var bias = 0.00025;
+        var bias = 0.1;
         //base color of SSAO
         var base = 0.5;
         //max value of SSAO
@@ -241,7 +248,7 @@ export class NormalScene implements CreateSceneClass {
             //View Space Fragment Position 
             mat4 projectionIN = inverse(projection);
             vec3 VS_fragPos = (projectionIN * vec4(fragPos, 1.0)).xyz;
-            //maybe to readjust add this: 
+            //to readjust depth add this: [MAYBE]
             VS_fragPos.z = depth;
                             
             //View Space Normal
@@ -250,7 +257,7 @@ export class NormalScene implements CreateSceneClass {
             //Tangent Space randomVec
             vec3 randomVec = getRandomVec3(vUV); 
 
-            //kernelSphere rotated along surface normal -> use TBN matrix 
+            //Generate kernelSphere rotated along surface normal -> use TBN matrix 
             vec3 tangent = normalize(randomVec - fragN * dot(randomVec, fragN));
             //gram schmidt:
             tangent = normalize(tangent - fragN * dot(tangent, fragN));
@@ -260,54 +267,66 @@ export class NormalScene implements CreateSceneClass {
 
             //The further the distance the bigger the radius in view space 
             float scale = radius / depth; 
+            //fixed for testing reasons
+            scale = radius;
 
             float ao = 0.0;
             float prueba = 0.0;
             for(int i = 0; i < numSamples; i++){
                 
-                //Sample position in view space
+                    //Sample position in view space
                 vec3 samplePosition =  TBN * kernelSphere[i];
 
-                //offset sample position
+                    //offset sample position with current fragment
                 samplePosition = VS_fragPos + samplePosition * scale;
 
-                //samplePos depth in View Space
+                    //samplePos depth in View Space
                 float sampleDepth = samplePosition.z; //Z aleatoria
 
-                //view -> (projection) -> clip -> (/ 2.0 + 0.5) -> screen
+                    //view -> (projection) -> clip -> (/ 2.0 + 0.5) -> screen
                 vec2 tempCoord = (projection * vec4(samplePosition, 1.0)).xy / 2.0 + 0.5;
-                //offset Depth is the real depth of the screen fragment at the same xy of samplePosition
+                    //offset Depth is the real depth of the screen fragment at the same xy of samplePosition
                 float offsetDepth = texture2D(depthTexture, tempCoord).r;
-                //difference is comparison of the depth of the sample and the depth at that position 
-                float difference = sampleDepth - (offsetDepth); 
-                // difference = - difference;
+                    //difference is comparison of the depth of the sample and the depth at that position 
+                
+                ////BEGIN [MY CODE]
+                // float difference = sampleDepth - offsetDepth; 
+                // float rangeCheck =  smoothstep(0.0, 1.0, scale / abs(difference)); //rehacer
+                // rangeCheck = 1.0 - offsetDepth; //rehacer
 
-                // float rangeCheck =  smoothstep(0.0001, 1.0, radius / abs(difference)); //rehacer
+                // ao += difference > 0.01 ? 1.0 * rangeCheck : 0.0;
+                ////END [MY CODE]
 
-                // rangeCheck = abs(difference) < area ? 1.0 : 0.0;
-
-                // ao += difference + bias > 0.001 ? 1.0 * rangeCheck : 0.0;
-                // ao += difference > 0.001 ? 1.0 * rangeCheck : 0.0;
-                ao += difference > 0.0 ? 1.0 : 0.0;
-                // prueba = offsetDepth;
+                ////BEGIN [GAMEDEV CODE]
+                vec3 VS_offsetPos = vec3(samplePosition.xy, offsetDepth);
+                vec3 diff = VS_offsetPos - VS_fragPos;
+                vec3 v = normalize(diff);
+                float d = length(diff) * scale;
+                // ao += max(0.0, dot(fragN, v) - bias) * (1.0 / (1.0 + d));
+                ao += max(0.0, dot(fragN, v) - bias);
+                
+                ////END [GAMEDEV CODE]
+                prueba = offsetDepth;
             }
             // prueba /= float(numSamples);
             ao /= float(numSamples);
             ao = 1.0 - ao;
 
+            
             // gl_FragColor = vec4(fragN, 1);
             // gl_FragColor = vec4(depth, depth, depth, 1);
-            // gl_FragColor = vec4(prueba, prueba, prueba, 1);
+            gl_FragColor = vec4(prueba, prueba, prueba, 1);
             // gl_FragColor = vec4(depthNDC, depthNDC, depthNDC, 1);
             // gl_FragColor = vec4(depthL, depthL, depthL, 1) ;
             // gl_FragColor = texture2D(depthTexture, vUV);
             // gl_FragColor = vec4(vUV.x, vUV.y, 0.0, 1.0);
             // gl_FragColor = texture2D(noiseTexture, vUV);
-            gl_FragColor = vec4(ao, ao, ao, 1);
             // gl_FragColor = vec4(fragNLength, fragNLength, fragNLength, 1);
             // gl_FragColor = vec4(fragPos, 1);
             // gl_FragColor = normalize(vec4(VS_fragPos, 1));
             // gl_FragColor = texture2D(textureSampler, vUV);
+            // gl_FragColor = texture2D(normalTexture, vUV);
+            gl_FragColor = vec4(ao, ao, ao, 1);
         }
 
         `;    
@@ -316,7 +335,7 @@ export class NormalScene implements CreateSceneClass {
         var normalPostProcessPass = new BABYLON.PostProcess(
             'Normal Post Process shader',
             'normalPostProcess',
-            ['radius', 'numSamples', 'kernelSphere', 'fallOff', 'area', 'projection', 'view', 'bias'],
+            ['radius', 'numSamples', 'kernelSphere', 'fallOff', 'projection', 'view', 'bias'],
             ['normalTexture', 'depthTexture', 'noiseTexture'],
             1.0,
             camera,
@@ -329,7 +348,6 @@ export class NormalScene implements CreateSceneClass {
             effect.setInt("numSamples", numSamples);
             effect.setArray3("kernelSphere", kernelSphereData2);
             effect.setFloat("fallOff", fallOff);
-            effect.setFloat("area", area);
             effect.setFloat("bias", bias);
 
             effect.setTexture("normalTexture", normalRenderTarget);
