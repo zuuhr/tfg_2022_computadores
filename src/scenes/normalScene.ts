@@ -159,10 +159,10 @@ export class NormalScene implements CreateSceneClass {
         var numSamples = 16;
         var kernelSphere = new BABYLON.SmartArray(16);
         //radius around the analyzed pixel. Default: 0.0006
-        var radius = 0.05;
+        var radius = 0.005;
         var fallOff = 0.000001;
         //Bias default: 0.025
-        var bias = 0.1;
+        var bias = 0.05;
         //base color of SSAO
         var base = 0.5;
         //max value of SSAO
@@ -268,10 +268,11 @@ export class NormalScene implements CreateSceneClass {
             //The further the distance the bigger the radius in view space 
             float scale = radius / depth; 
             //fixed for testing reasons
-            scale = radius;
+            // scale = radius;
 
             float ao = 0.0;
             float prueba = 0.0;
+            vec3 pruebaVec = VS_fragPos;
             for(int i = 0; i < numSamples; i++){
                 
                     //Sample position in view space
@@ -302,33 +303,43 @@ export class NormalScene implements CreateSceneClass {
                 ////comprobar si la superficie ocluye hacia el fragmento 
                 vec3 VS_offsetPos = vec3(samplePosition.xy, offsetDepth);
                 vec3 diff = VS_offsetPos - VS_fragPos;
+                diff = -diff;
                 vec3 v = normalize(diff);
                 float d = length(diff) * scale;
+                d = length(diff);
                 // ao += max(0.0, dot(fragN, v) - bias) * (1.0 / (1.0 + d));
-                ao += max(0.0, dot(fragN, v) - bias);
+                ao += max(0.0, dot(fragN, v) ) * (1.0 / (1.0 + d * 200.0)) -bias;
+                
                 
                 ////END [GAMEDEV CODE]
-                prueba = offsetDepth;
+                prueba = max(0.0, dot(fragN, v) - bias);
+                prueba =  dot(fragN, v);
+                pruebaVec = samplePosition;
+                pruebaVec = VS_offsetPos;
             }
             // prueba /= float(numSamples);
             ao /= float(numSamples);
+            // ao *= 500.0;
             ao = 1.0 - ao;
 
             
             // gl_FragColor = vec4(fragN, 1);
             // gl_FragColor = vec4(depth, depth, depth, 1);
-            gl_FragColor = vec4(prueba, prueba, prueba, 1);
             // gl_FragColor = vec4(depthNDC, depthNDC, depthNDC, 1);
             // gl_FragColor = vec4(depthL, depthL, depthL, 1) ;
             // gl_FragColor = texture2D(depthTexture, vUV);
             // gl_FragColor = vec4(vUV.x, vUV.y, 0.0, 1.0);
             // gl_FragColor = texture2D(noiseTexture, vUV);
+            // gl_FragColor = vec4(tangent, 1);
+            // gl_FragColor = vec4(binormal, 1);
             // gl_FragColor = vec4(fragNLength, fragNLength, fragNLength, 1);
             // gl_FragColor = vec4(fragPos, 1);
             // gl_FragColor = normalize(vec4(VS_fragPos, 1));
             // gl_FragColor = texture2D(textureSampler, vUV);
             // gl_FragColor = texture2D(normalTexture, vUV);
             gl_FragColor = vec4(ao, ao, ao, 1);
+            // gl_FragColor = vec4(pruebaVec, 1);
+            // gl_FragColor = vec4(prueba, prueba, prueba, 1);
         }
 
         `;    
