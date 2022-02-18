@@ -268,7 +268,7 @@ export class NormalScene implements CreateSceneClass {
             //The further the distance the bigger the radius in view space 
             float scale = radius / depth; 
             //fixed for testing reasons
-            // scale = radius;
+            scale = radius;
 
             float ao = 0.0;
             float prueba = 0.0;
@@ -380,9 +380,72 @@ export class NormalScene implements CreateSceneClass {
         console.log("Near Plane: " + camera.minZ);
         console.log("Far Plane: " + camera.maxZ);
         
-        // normalRenderTarget.getCustomRenderList(0, boxes, numBoxes * numBoxes);
-        
-        // I left where nromasl must be transformed into view space
+
+        //Blur
+
+        //Horizontal vs Vertical
+        var HV = 1.0;
+        var kernelSize = 5;
+
+        BABYLON.Effect.ShadersStore.blurPostProcessFragmentShader = `
+            precision highp float;
+            
+            varying vec2 vUV;
+            varying vec4 vPosition;
+
+            uniform sampler2D textureSampler;
+
+            uniform float HV;
+            uniform int kernelSize;
+
+            void main(void){
+                vec4 col = texture2D(textureSampler, vUV);
+                vec2 res = vec2(float(textureSize(textureSampler, 0).x), float(textureSize(textureSampler, 0).y) );
+                vec2 offset = vec2(1.0 * HV, 1.0 - 1.0 * HV) / res;
+                for(int i = 0; i < kernelSize; i++){
+                    col += texture2D(textureSampler, vUV + offset * float(i));
+                    col += texture2D(textureSampler, vUV - offset * float(i));
+                }
+                col /= float(kernelSize) * 2.0 + 1.0;
+                gl_FragColor = col;
+            }
+        `;
+
+        var horizontalBlurPostProcessPass = new BABYLON.PostProcess(
+            'Horizontal Blur Post Process shader',
+            'blurPostProcess',
+            ['HV', 'kernelSize'],
+            [],
+            1.0,
+            camera,
+            BABYLON.Texture.BILINEAR_SAMPLINGMODE,
+            engine
+        );
+
+        horizontalBlurPostProcessPass.onApply = function(effect){
+            HV = 1.0;
+            effect.setFloat("HV", HV);
+            effect.setInt("kernelSize", kernelSize);
+        }
+
+        var verticalBlurPostProcessPass = new BABYLON.PostProcess(
+            'Horizontal Blur Post Process shader',
+            'blurPostProcess',
+            ['HV', 'kernelSize'],
+            [],
+            1.0,
+            camera,
+            BABYLON.Texture.BILINEAR_SAMPLINGMODE,
+            engine
+        );
+
+        verticalBlurPostProcessPass.onApply = function(effect){
+            HV = 0.0;
+            effect.setFloat("HV", HV);
+            effect.setInt("kernelSize", kernelSize);
+        }
+
+
         return scene;
 
     };
