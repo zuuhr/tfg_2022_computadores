@@ -4,9 +4,11 @@ import * as BABYLON from 'babylonjs';
 export class NormalScene implements CreateSceneClass {
     createScene = async (engine: BABYLON.Engine, canvas: HTMLCanvasElement):
         Promise<BABYLON.Scene> => {
+
         // Create scene
         var scene = new BABYLON.Scene(engine);
-        scene.clearColor = new BABYLON.Color4(0.2, 0.2, 0.2, 1);
+        scene.clearColor = new BABYLON.Color4(0, 0, 0, 1);
+            
 
         // Create camera
         var camera = new BABYLON.FreeCamera("camera", new BABYLON.Vector3(29, 13, 23), scene);
@@ -162,7 +164,7 @@ export class NormalScene implements CreateSceneClass {
         var radius = 0.005;
         var fallOff = 0.000001;
         //Bias default: 0.025
-        var bias = 0.05;
+        var bias = 0.02;
         //base color of SSAO
         var base = 0.5;
         //max value of SSAO
@@ -256,11 +258,13 @@ export class NormalScene implements CreateSceneClass {
 
             //Tangent Space randomVec
             vec3 randomVec = getRandomVec3(vUV); 
+            // randomVec = vec3(1.0, 0.0, 0.0);
 
             //Generate kernelSphere rotated along surface normal -> use TBN matrix 
             vec3 tangent = normalize(randomVec - fragN * dot(randomVec, fragN));
             //gram schmidt:
             tangent = normalize(tangent - fragN * dot(tangent, fragN));
+
             vec3 binormal = cross(fragN, tangent);
             mat3 TBN = mat3(tangent, binormal, fragN);
 
@@ -268,11 +272,12 @@ export class NormalScene implements CreateSceneClass {
             //The further the distance the bigger the radius in view space 
             float scale = radius / depth; 
             //fixed for testing reasons
-            scale = radius;
+            //TODO: tamaño maximo
+            // scale = radius;
 
             float ao = 0.0;
             float prueba = 0.0;
-            vec3 pruebaVec = VS_fragPos;
+            vec3 pruebaVec = binormal;
             for(int i = 0; i < numSamples; i++){
                 
                     //Sample position in view space
@@ -308,14 +313,15 @@ export class NormalScene implements CreateSceneClass {
                 float d = length(diff) * scale;
                 d = length(diff);
                 // ao += max(0.0, dot(fragN, v) - bias) * (1.0 / (1.0 + d));
-                ao += max(0.0, dot(fragN, v) ) * (1.0 / (1.0 + d * 200.0)) -bias;
+                float rangeCheck =  1.0 / (1.0 + d * 200.0);
+                ao += max(0.0, dot(fragN, v) ) * rangeCheck - bias;
                 
                 
                 ////END [GAMEDEV CODE]
                 prueba = max(0.0, dot(fragN, v) - bias);
                 prueba =  dot(fragN, v);
-                pruebaVec = samplePosition;
-                pruebaVec = VS_offsetPos;
+                // pruebaVec = samplePosition;
+                pruebaVec = v * 0.5 + 0.5;
             }
             // prueba /= float(numSamples);
             ao /= float(numSamples);
@@ -356,48 +362,49 @@ export class NormalScene implements CreateSceneClass {
             engine
         );
 
+        // scene.clearColor = new BABYLON.Color4(0.2, 0.2, 0.2, 1);
         normalPostProcessPass.onApply = function (effect) {
             effect.setFloat("radius", radius);
             effect.setInt("numSamples", numSamples);
             effect.setArray3("kernelSphere", kernelSphereData2);
             effect.setFloat("fallOff", fallOff);
             effect.setFloat("bias", bias);
-
+            
             effect.setTexture("normalTexture", normalRenderTarget);
             effect.setTexture("depthTexture", depthTexture);
             effect.setTexture("noiseTexture", noiseTexture);
-
+            
             //we need to set uniform matrices in PostProcess shaders
             effect.setMatrix("projection", camera.getProjectionMatrix(true));
             effect.setMatrix("view", camera.getViewMatrix(true));
             //world matrix
-
+            
             effect.setFloat("near", camera.minZ);
             effect.setFloat("far", camera.maxZ);
         }
-
-
+        
+        
         console.log("Near Plane: " + camera.minZ);
         console.log("Far Plane: " + camera.maxZ);
         
-
+        
         //Blur
-
+        
         //Horizontal vs Vertical
         var HV = 1.0;
-        var kernelSize = 5;
-
+        var kernelSize = 3;
+        
         BABYLON.Effect.ShadersStore.blurPostProcessFragmentShader = `
-            precision highp float;
-            
-            varying vec2 vUV;
-            varying vec4 vPosition;
-
-            uniform sampler2D textureSampler;
-
+        precision highp float;
+        
+        varying vec2 vUV;
+        varying vec4 vPosition;
+        
+        uniform sampler2D textureSampler;
+        
             uniform float HV;
             uniform int kernelSize;
-
+            
             void main(void){
                 vec4 col = texture2D(textureSampler, vUV);
                 vec2 res = vec2(float(textureSize(textureSampler, 0).x), float(textureSize(textureSampler, 0).y) );
@@ -409,46 +416,69 @@ export class NormalScene implements CreateSceneClass {
                 col /= float(kernelSize) * 2.0 + 1.0;
                 gl_FragColor = col;
             }
-        `;
+            `;
+            
+            var horizontalBlurPostProcessPass = new BABYLON.PostProcess(
+                'Horizontal Blur Post Process shader',
+                'blurPostProcess',
+                ['HV', 'kernelSize'],
+                [],
+                1.0,
+                camera,
+                BABYLON.Texture.BILINEAR_SAMPLINGMODE,
+                engine
+                );
+                
+                horizontalBlurPostProcessPass.onApply = function(effect){
+                    HV = 1.0;
+                    effect.setFloat("HV", HV);
+                    effect.setInt("kernelSize", kernelSize);
+                }
+                
+                var verticalBlurPostProcessPass = new BABYLON.PostProcess(
+                    'Horizontal Blur Post Process shader',
+                    'blurPostProcess',
+                    ['HV', 'kernelSize'],
+                    [],
+                    1.0,
+                    camera,
+                    BABYLON.Texture.BILINEAR_SAMPLINGMODE,
+                    engine
+                    );
+                    // scene.clearColor = new BABYLON.Color4(1, 1, 1, 1);
+                    verticalBlurPostProcessPass.onApply = function(effect){
+                        // scene.clearColor = new BABYLON.Color4(0.2, 0.2, 0.2, 1);
+                        HV = 0.0;
+                        effect.setFloat("HV", HV);
+                        effect.setInt("kernelSize", kernelSize);
+                    }
+                    
 
-        var horizontalBlurPostProcessPass = new BABYLON.PostProcess(
-            'Horizontal Blur Post Process shader',
-            'blurPostProcess',
-            ['HV', 'kernelSize'],
-            [],
-            1.0,
-            camera,
-            BABYLON.Texture.BILINEAR_SAMPLINGMODE,
-            engine
-        );
 
-        horizontalBlurPostProcessPass.onApply = function(effect){
-            HV = 1.0;
-            effect.setFloat("HV", HV);
-            effect.setInt("kernelSize", kernelSize);
-        }
+                    scene.onKeyboardObservable.add((keyInfo) => {
+                        if (keyInfo.type == BABYLON.KeyboardEventTypes.KEYDOWN){
+                            switch(keyInfo.event.key){
+                                case "f":
+                                case "F":
+                                    screenCapture();
+                                break
+                            };
+                        };
+                    });
 
-        var verticalBlurPostProcessPass = new BABYLON.PostProcess(
-            'Horizontal Blur Post Process shader',
-            'blurPostProcess',
-            ['HV', 'kernelSize'],
-            [],
-            1.0,
-            camera,
-            BABYLON.Texture.BILINEAR_SAMPLINGMODE,
-            engine
-        );
+                    function screenCapture() {
+                        BABYLON.Tools.CreateScreenshot(engine, camera, { width:canvas.width, height:canvas.height},);
+                        console.log("Screen Capture Taken");
+                        
+                    }
+                    
 
-        verticalBlurPostProcessPass.onApply = function(effect){
-            HV = 0.0;
-            effect.setFloat("HV", HV);
-            effect.setInt("kernelSize", kernelSize);
-        }
+                    return scene;
+                    
+                };
+                
+            }
+         
+            
+            export default new NormalScene();
 
-
-        return scene;
-
-    };
-}
-
-export default new NormalScene();
