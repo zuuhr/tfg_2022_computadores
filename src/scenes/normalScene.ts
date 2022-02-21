@@ -66,70 +66,15 @@ export class NormalScene implements CreateSceneClass {
         });
 
         var dirLight = new BABYLON.DirectionalLight("dirLight", new BABYLON.Vector3(0, -1, -1), scene);
-
+        
+        var shader = "";
 
         //Normal Texture Pass
-        BABYLON.Effect.ShadersStore.normalTextureVertexShader = `
-        precision highp float;
+        shader = (await fetch("normal.vertex").then(response => response.text())).toString();
+        BABYLON.Effect.ShadersStore.normalTextureVertexShader = shader;
 
-        // Attributes
-        attribute vec3 position;
-        attribute vec3 normal;
-        attribute vec2 uv;
-
-        // Uniforms
-        uniform mat4 worldViewProjection;
-        uniform mat4 worldView;
-
-        // Varying
-        varying vec4 vPosition;
-        varying vec3 vNormal;
-        // Varying
-        varying vec2 vUV;
-        void main() {
-
-            vec4 p = vec4( position, 1.0 );
-
-            vPosition = p;
-            vNormal = (transpose(inverse(worldView)) * vec4(normal, 0.0)).xyz;
-            vUV = uv;
-            gl_Position = worldViewProjection * p;
-
-        }
-        `;
-
-        BABYLON.Effect.ShadersStore.normalTextureFragmentShader = `
-        precision highp float;
-
-        //Uniforms
-        uniform sampler2D textureSampler;
-        uniform sampler2D normalTexture;
-        uniform mat4 worldViewProjection;
-        uniform mat4 worldView;
-        uniform mat4 view;
-        uniform mat4 world;
-        
-        //Varying
-        varying vec2 vUV;
-        varying vec3 vNormal;
-        varying vec4 vPosition;
-
-        void main(void){
-            //AQUI EL FALLO
-            //model space normal
-            vec4 normal = vec4(vNormal, 1);
-            normal.z = -normal.z;
-            //world space normal (world matrix is model matrix on unity)
-            // vec4 SP_Normal = transpose(inverse(worldView)) * normal;  //NO SE ME VUELVE A OLVIDAR 
-            vec4 SP_Normal = normal; 
-            gl_FragColor = SP_Normal;
-            //Fin Normal 
-
-            // gl_FragColor = worldView * vPosition;
-            
-            // gl_FragColor = texture2D(textureSampler, vUV);
-        }
-        `;
+        shader = (await fetch("normal.fragment").then(response => response.text())).toString();
+        BABYLON.Effect.ShadersStore.normalTextureFragmentShader = shader;
 
         var normalTextureMaterial = new BABYLON.ShaderMaterial(
             'normal texture material',
@@ -185,11 +130,6 @@ export class NormalScene implements CreateSceneClass {
         }
         var kernelSphereData = kernelSphere.data.map(Number);
 
-        kernelSphereData.forEach(element => {
-            console.log(element.toString());
-        });
-        console.log(kernelSphereData2.toString());
-
         //Noise texture
         var noiseTexture = new BABYLON.Texture("Noise.png", scene);
         noiseTexture.wrapU = BABYLON.Texture.WRAP_ADDRESSMODE;
@@ -199,145 +139,8 @@ export class NormalScene implements CreateSceneClass {
         var depthTexture = scene.enableDepthRenderer(camera, false).getDepthMap(); //false to get linear depht, true to get logarithmic depth
 
         //SSAO Shader
-        BABYLON.Effect.ShadersStore.normalPostProcessFragmentShader = `
-        precision highp float;
-        
-        varying vec2 vUV;
-        varying vec4 vPosition;
-        
-        uniform sampler2D textureSampler;
-        uniform sampler2D normalTexture;
-        uniform sampler2D depthTexture;
-        uniform sampler2D noiseTexture;
-
-        uniform float radius;
-        uniform int numSamples;
-        uniform vec3 kernelSphere[16]; 
-        uniform float fallOff;
-        uniform float area;
-        uniform float bias;
-
-        uniform mat4 projection; 
-        uniform mat4 view; 
-
-        uniform float near;
-        uniform float far;
-
-        vec3 getRandomVec3(vec2 uv){
-            return normalize( 
-                vec3( texture2D(noiseTexture, uv).rg * 2.0 - 1.0,
-                0.0) 
-            );
-        }
-        
-        vec3 viewSpaceToWorldSpace(vec3 v){
-            return (inverse(view) * vec4(v, 1.0)).xyz;
-        }
-
-        void main(void){
-            //Linear depth from texture
-            float depth = texture2D(depthTexture, vUV).r;
-
-            //Clip Space Fragment Position (z scale in ss and vs don't vary) screen space (* 2.0 - 1.0) - > clip space
-            vec3 fragPos = vec3(vUV * 2.0 - 1.0, depth);
-            
-            //View Space Fragment Position 
-            mat4 projectionIN = inverse(projection);
-            vec3 VS_fragPos = (projectionIN * vec4(fragPos, 1.0)).xyz;
-            //to readjust depth add this: [MAYBE]
-            VS_fragPos.z = depth;
-                            
-            //View Space Normal
-            vec3 fragN = normalize(texture2D(normalTexture, vUV).xyz);
-
-            //Tangent Space randomVec
-            vec3 randomVec = getRandomVec3(vUV); 
-            // randomVec = vec3(1.0, 0.0, 0.0);
-
-            //Generate kernelSphere rotated along surface normal -> use TBN matrix 
-            vec3 tangent = normalize(randomVec - fragN * dot(randomVec, fragN));
-            //gram schmidt:
-            tangent = normalize(tangent - fragN * dot(tangent, fragN));
-
-            vec3 binormal = cross(fragN, tangent);
-            mat3 TBN = mat3(tangent, binormal, fragN);
-
-
-            //The further the distance the bigger the radius in view space 
-            float scale = radius / depth; 
-            //fixed for testing reasons
-            //TODO: tamaño maximo
-            // scale = radius;
-
-            float ao = 0.0;
-            float prueba = 0.0;
-            vec3 pruebaVec = binormal;
-            for(int i = 0; i < numSamples; i++){
-                
-                    //Sample position in view space
-                vec3 samplePosition =  TBN * kernelSphere[i];
-
-                    //offset sample position with current fragment
-                samplePosition = VS_fragPos + samplePosition * scale;
-
-                    //samplePos depth in View Space
-                float sampleDepth = samplePosition.z; //Z aleatoria
-
-                    //view -> (projection) -> clip -> (/ 2.0 + 0.5) -> screen
-                vec2 tempCoord = (projection * vec4(samplePosition, 1.0)).xy / 2.0 + 0.5;
-                    //offset Depth is the real depth of the screen fragment at the same xy of samplePosition
-                float offsetDepth = texture2D(depthTexture, tempCoord).r;
-                    //difference is comparison of the depth of the sample and the depth at that position 
-                
-                ////BEGIN [MY CODE]
-                ////comprobar si está ocluido el sample Position
-                // float difference = sampleDepth - offsetDepth; 
-                // float rangeCheck =  smoothstep(0.0, 1.0, scale / abs(difference)); //rehacer
-                // rangeCheck = 1.0 - offsetDepth; //rehacer
-
-                // ao += difference > 0.01 ? 1.0 * rangeCheck : 0.0;
-                ////END [MY CODE]
-
-                ////BEGIN [GAMEDEV CODE]
-                ////comprobar si la superficie ocluye hacia el fragmento 
-                vec3 VS_offsetPos = vec3(samplePosition.xy, offsetDepth);
-                vec3 diff = VS_offsetPos - VS_fragPos;
-                diff = -diff;
-                vec3 v = normalize(diff);
-                float d = length(diff) * scale;
-                d = length(diff);
-                // ao += max(0.0, dot(fragN, v) - bias) * (1.0 / (1.0 + d));
-                float rangeCheck =  1.0 / (1.0 + d * 200.0);
-                ao += max(0.0, dot(fragN, v) ) * rangeCheck - bias;
-                
-                
-                ////END [GAMEDEV CODE]
-                prueba = max(0.0, dot(fragN, v) - bias);
-                prueba =  dot(fragN, v);
-                // pruebaVec = samplePosition;
-                pruebaVec = v * 0.5 + 0.5;
-                // if(i == numSamples - 2){
-                //     pruebaVec = v;
-                // }
-            }
-            // prueba /= float(numSamples);
-            ao /= float(numSamples);
-            // ao *= 500.0;
-            ao = 1.0 - ao;
-
-            // pruebaVec = VS_fragPos;
-            
-            // gl_FragColor = vec4(depth, depth, depth, 1);
-            // gl_FragColor = texture2D(noiseTexture, vUV);
-            // gl_FragColor = vec4(tangent, 1);
-            // gl_FragColor = vec4(binormal, 1);
-            // gl_FragColor = vec4(fragN, 1);
-            // gl_FragColor = texture2D(textureSampler, vUV);
-            gl_FragColor = vec4(ao, ao, ao, 1);
-            gl_FragColor = vec4(pruebaVec, 1);
-            // gl_FragColor = vec4(prueba, prueba, prueba, 1);
-        }
-        `;
+        shader = (await fetch("ssao.fragment").then(response => response.text())).toString();
+        BABYLON.Effect.ShadersStore.normalPostProcessFragmentShader = shader;
 
 
         var normalPostProcessPass = new BABYLON.PostProcess(
@@ -370,75 +173,12 @@ export class NormalScene implements CreateSceneClass {
             effect.setFloat("far", camera.maxZ);
         }
 
-
-        console.log("Near Plane: " + camera.minZ);
-        console.log("Far Plane: " + camera.maxZ);
-
-
         //Blur Pass
-
-        //Horizontal vs Vertical
-        var HV = 1.0;
-        var kernelSize = 3;
-
-        BABYLON.Effect.ShadersStore.blurPostProcessFragmentShader = `
-        precision highp float;
-        
-        varying vec2 vUV;
-        varying vec4 vPosition;
-        
-        uniform sampler2D textureSampler;
-        
-            uniform float HV;
-            uniform int kernelSize;
-            
-            void main(void){
-                vec4 col = texture2D(textureSampler, vUV);
-                vec2 res = vec2(float(textureSize(textureSampler, 0).x), float(textureSize(textureSampler, 0).y) );
-                vec2 offset = vec2(1.0 * HV, 1.0 - 1.0 * HV) / res;
-                for(int i = 0; i < kernelSize; i++){
-                    col += texture2D(textureSampler, vUV + offset * float(i));
-                    col += texture2D(textureSampler, vUV - offset * float(i));
-                }
-                col /= float(kernelSize) * 2.0 + 1.0;
-                gl_FragColor = col;
-            }
-            `;
-
-        var horizontalBlurPostProcessPass = new BABYLON.PostProcess(
-            'Horizontal Blur Post Process shader',
-            'blurPostProcess',
-            ['HV', 'kernelSize'],
-            [],
-            1.0,
-            camera,
-            BABYLON.Texture.BILINEAR_SAMPLINGMODE,
-            engine
-        );
-
-        horizontalBlurPostProcessPass.onApply = function (effect) {
-            HV = 1.0;
-            effect.setFloat("HV", HV);
-            effect.setInt("kernelSize", kernelSize);
-        }
-
-        var verticalBlurPostProcessPass = new BABYLON.PostProcess(
-            'Horizontal Blur Post Process shader',
-            'blurPostProcess',
-            ['HV', 'kernelSize'],
-            [],
-            1.0,
-            camera,
-            BABYLON.Texture.BILINEAR_SAMPLINGMODE,
-            engine
-        );
-
-        verticalBlurPostProcessPass.onApply = function (effect) {
-            HV = 0.0;
-            effect.setFloat("HV", HV);
-            effect.setInt("kernelSize", kernelSize);
-        }
-        // scene.clearColor = new BABYLON.Color4(0.2, 0.2, 0.2, 1); //Apply on composite Pass
+        //Horizontal & Vertical
+        var hBlurPass = new BABYLON.BlurPostProcess("Horizontal Blur Post Process", new BABYLON.Vector2(1, 0), 11, 0.5, camera);
+        var vBlurPass = new BABYLON.BlurPostProcess("Vertical Blur Post Process", new BABYLON.Vector2(0, 1), 11, 0.5, camera);
+        hBlurPass.apply;
+        vBlurPass.apply;
 
         return scene;
     };
