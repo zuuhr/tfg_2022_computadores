@@ -8,7 +8,6 @@ export class NormalScene implements CreateSceneClass {
         // Create scene
         var scene = new BABYLON.Scene(engine);
         scene.clearColor = new BABYLON.Color4(0, 0, 0, 1);
-            
 
         // Create camera
         var camera = new BABYLON.FreeCamera("camera", new BABYLON.Vector3(29, 13, 23), scene);
@@ -18,12 +17,12 @@ export class NormalScene implements CreateSceneClass {
         camera.minZ = 0.1;
 
         //Geometry
-        var planeH = BABYLON.MeshBuilder.CreatePlane("planeH", {height:60, width:60, sideOrientation:2});
-        planeH.lookAt(new BABYLON.Vector3(0,1,0));
-        var planeF = BABYLON.MeshBuilder.CreatePlane("planeF", {height:60, width:60, sideOrientation:2});
-        planeF.lookAt(new BABYLON.Vector3(0,0,-1));
-        var planeR = BABYLON.MeshBuilder.CreatePlane("planeR", {height:60, width:60, sideOrientation:2});
-        planeR.lookAt(new BABYLON.Vector3(1,0,0));
+        var planeH = BABYLON.MeshBuilder.CreatePlane("planeH", { height: 60, width: 60, sideOrientation: 2 });
+        planeH.lookAt(new BABYLON.Vector3(0, 1, 0));
+        var planeF = BABYLON.MeshBuilder.CreatePlane("planeF", { height: 60, width: 60, sideOrientation: 2 });
+        planeF.lookAt(new BABYLON.Vector3(0, 0, -1));
+        var planeR = BABYLON.MeshBuilder.CreatePlane("planeR", { height: 60, width: 60, sideOrientation: 2 });
+        planeR.lookAt(new BABYLON.Vector3(1, 0, 0));
         // Create some boxes and deactivate lighting (specular color and back faces)
         var boxMaterial = new BABYLON.StandardMaterial("boxMaterail", scene);
         boxMaterial.diffuseTexture = new BABYLON.Texture("./ground.jpg", scene);
@@ -45,10 +44,10 @@ export class NormalScene implements CreateSceneClass {
         var angle = 0.02;
         var pivot = new BABYLON.TransformNode("root");
         sphere.parent = pivot;
-        scene.registerAfterRender(function () { 
-	        // sphere.rotate(new BABYLON.Vector3(0,1,0), angle, BABYLON.Space.WORLD);
-	        // pivot.rotate(new BABYLON.Vector3(0,1,0), angle, BABYLON.Space.WORLD);
-        });    
+        scene.registerAfterRender(function () {
+            // sphere.rotate(new BABYLON.Vector3(0,1,0), angle, BABYLON.Space.WORLD);
+            // pivot.rotate(new BABYLON.Vector3(0,1,0), angle, BABYLON.Space.WORLD);
+        });
 
         var numBoxes = 2;
         for (var i = 0; i < numBoxes; i++) {
@@ -69,9 +68,7 @@ export class NormalScene implements CreateSceneClass {
         var dirLight = new BABYLON.DirectionalLight("dirLight", new BABYLON.Vector3(0, -1, -1), scene);
 
 
-        //Normal Texture
-        // var normalTexure = new BABYLON.InternalTexture(engine, 5);
-
+        //Normal Texture Pass
         BABYLON.Effect.ShadersStore.normalTextureVertexShader = `
         precision highp float;
 
@@ -139,29 +136,24 @@ export class NormalScene implements CreateSceneClass {
             scene,
             'normalTexture',
             {
-                attributes:['position', 'normal', 'uv'],
+                attributes: ['position', 'normal', 'uv'],
                 uniforms: ['worldViewProjection', 'view', 'worldView', 'world']
             }
         );
-
 
         var normalRenderTarget = new BABYLON.RenderTargetTexture('normal texture', canvas, scene, false);
         normalRenderTarget.activeCamera = camera;
         scene.customRenderTargets.push(normalRenderTarget);
         normalRenderTarget.renderList = boxes;
-        
-        normalRenderTarget.render();
-        
 
+        normalRenderTarget.render();
         normalRenderTarget.setMaterialForRendering(boxes, normalTextureMaterial);
 
-        
-
-        //post process shader
+        //SSAO Pass
         var numSamples = 16;
         var kernelSphere = new BABYLON.SmartArray(16);
         //radius around the analyzed pixel. Default: 0.0006
-        var radius = 0.005;
+        var radius = 0.01;
         var fallOff = 0.000001;
         //Bias default: 0.025
         var bias = 0.02;
@@ -192,23 +184,21 @@ export class NormalScene implements CreateSceneClass {
             kernelSphereData2.push(parseFloat(sample.z.toString()));
         }
         var kernelSphereData = kernelSphere.data.map(Number);
-        
-        
+
         kernelSphereData.forEach(element => {
-           console.log(element.toString()); 
+            console.log(element.toString());
         });
         console.log(kernelSphereData2.toString());
-        
-        
-        //noise texture
-        // var noiseTexture = this._generateNoiseTexture(scene);
-        // var noiseTexture = new BABYLON.Texture("https://imgur.com/BJwNGuo", scene);
+
+        //Noise texture
         var noiseTexture = new BABYLON.Texture("Noise.png", scene);
         noiseTexture.wrapU = BABYLON.Texture.WRAP_ADDRESSMODE;
         noiseTexture.wrapV = BABYLON.Texture.WRAP_ADDRESSMODE;
-        //with false it works just fine
+
+        //Depth texture
         var depthTexture = scene.enableDepthRenderer(camera, false).getDepthMap(); //false to get linear depht, true to get logarithmic depth
 
+        //SSAO Shader
         BABYLON.Effect.ShadersStore.normalPostProcessFragmentShader = `
         precision highp float;
         
@@ -240,6 +230,10 @@ export class NormalScene implements CreateSceneClass {
             );
         }
         
+        vec3 viewSpaceToWorldSpace(vec3 v){
+            return (inverse(view) * vec4(v, 1.0)).xyz;
+        }
+
         void main(void){
             //Linear depth from texture
             float depth = texture2D(depthTexture, vUV).r;
@@ -322,33 +316,28 @@ export class NormalScene implements CreateSceneClass {
                 prueba =  dot(fragN, v);
                 // pruebaVec = samplePosition;
                 pruebaVec = v * 0.5 + 0.5;
+                // if(i == numSamples - 2){
+                //     pruebaVec = v;
+                // }
             }
             // prueba /= float(numSamples);
             ao /= float(numSamples);
             // ao *= 500.0;
             ao = 1.0 - ao;
 
+            // pruebaVec = VS_fragPos;
             
-            // gl_FragColor = vec4(fragN, 1);
             // gl_FragColor = vec4(depth, depth, depth, 1);
-            // gl_FragColor = vec4(depthNDC, depthNDC, depthNDC, 1);
-            // gl_FragColor = vec4(depthL, depthL, depthL, 1) ;
-            // gl_FragColor = texture2D(depthTexture, vUV);
-            // gl_FragColor = vec4(vUV.x, vUV.y, 0.0, 1.0);
             // gl_FragColor = texture2D(noiseTexture, vUV);
             // gl_FragColor = vec4(tangent, 1);
             // gl_FragColor = vec4(binormal, 1);
-            // gl_FragColor = vec4(fragNLength, fragNLength, fragNLength, 1);
-            // gl_FragColor = vec4(fragPos, 1);
-            // gl_FragColor = normalize(vec4(VS_fragPos, 1));
+            // gl_FragColor = vec4(fragN, 1);
             // gl_FragColor = texture2D(textureSampler, vUV);
-            // gl_FragColor = texture2D(normalTexture, vUV);
             gl_FragColor = vec4(ao, ao, ao, 1);
-            // gl_FragColor = vec4(pruebaVec, 1);
+            gl_FragColor = vec4(pruebaVec, 1);
             // gl_FragColor = vec4(prueba, prueba, prueba, 1);
         }
-
-        `;    
+        `;
 
 
         var normalPostProcessPass = new BABYLON.PostProcess(
@@ -367,33 +356,31 @@ export class NormalScene implements CreateSceneClass {
             effect.setFloat("radius", radius);
             effect.setInt("numSamples", numSamples);
             effect.setArray3("kernelSphere", kernelSphereData2);
-            effect.setFloat("fallOff", fallOff);
             effect.setFloat("bias", bias);
-            
+
             effect.setTexture("normalTexture", normalRenderTarget);
             effect.setTexture("depthTexture", depthTexture);
             effect.setTexture("noiseTexture", noiseTexture);
-            
+
             //we need to set uniform matrices in PostProcess shaders
             effect.setMatrix("projection", camera.getProjectionMatrix(true));
             effect.setMatrix("view", camera.getViewMatrix(true));
-            //world matrix
-            
+
             effect.setFloat("near", camera.minZ);
             effect.setFloat("far", camera.maxZ);
         }
-        
-        
+
+
         console.log("Near Plane: " + camera.minZ);
         console.log("Far Plane: " + camera.maxZ);
-        
-        
-        //Blur
-        
+
+
+        //Blur Pass
+
         //Horizontal vs Vertical
         var HV = 1.0;
         var kernelSize = 3;
-        
+
         BABYLON.Effect.ShadersStore.blurPostProcessFragmentShader = `
         precision highp float;
         
@@ -417,68 +404,44 @@ export class NormalScene implements CreateSceneClass {
                 gl_FragColor = col;
             }
             `;
-            
-            var horizontalBlurPostProcessPass = new BABYLON.PostProcess(
-                'Horizontal Blur Post Process shader',
-                'blurPostProcess',
-                ['HV', 'kernelSize'],
-                [],
-                1.0,
-                camera,
-                BABYLON.Texture.BILINEAR_SAMPLINGMODE,
-                engine
-                );
-                
-                horizontalBlurPostProcessPass.onApply = function(effect){
-                    HV = 1.0;
-                    effect.setFloat("HV", HV);
-                    effect.setInt("kernelSize", kernelSize);
-                }
-                
-                var verticalBlurPostProcessPass = new BABYLON.PostProcess(
-                    'Horizontal Blur Post Process shader',
-                    'blurPostProcess',
-                    ['HV', 'kernelSize'],
-                    [],
-                    1.0,
-                    camera,
-                    BABYLON.Texture.BILINEAR_SAMPLINGMODE,
-                    engine
-                    );
-                    // scene.clearColor = new BABYLON.Color4(1, 1, 1, 1);
-                    verticalBlurPostProcessPass.onApply = function(effect){
-                        // scene.clearColor = new BABYLON.Color4(0.2, 0.2, 0.2, 1);
-                        HV = 0.0;
-                        effect.setFloat("HV", HV);
-                        effect.setInt("kernelSize", kernelSize);
-                    }
-                    
 
+        var horizontalBlurPostProcessPass = new BABYLON.PostProcess(
+            'Horizontal Blur Post Process shader',
+            'blurPostProcess',
+            ['HV', 'kernelSize'],
+            [],
+            1.0,
+            camera,
+            BABYLON.Texture.BILINEAR_SAMPLINGMODE,
+            engine
+        );
 
-                    scene.onKeyboardObservable.add((keyInfo) => {
-                        if (keyInfo.type == BABYLON.KeyboardEventTypes.KEYDOWN){
-                            switch(keyInfo.event.key){
-                                case "f":
-                                case "F":
-                                    screenCapture();
-                                break
-                            };
-                        };
-                    });
+        horizontalBlurPostProcessPass.onApply = function (effect) {
+            HV = 1.0;
+            effect.setFloat("HV", HV);
+            effect.setInt("kernelSize", kernelSize);
+        }
 
-                    function screenCapture() {
-                        BABYLON.Tools.CreateScreenshot(engine, camera, { width:canvas.width, height:canvas.height},);
-                        console.log("Screen Capture Taken");
-                        
-                    }
-                    
+        var verticalBlurPostProcessPass = new BABYLON.PostProcess(
+            'Horizontal Blur Post Process shader',
+            'blurPostProcess',
+            ['HV', 'kernelSize'],
+            [],
+            1.0,
+            camera,
+            BABYLON.Texture.BILINEAR_SAMPLINGMODE,
+            engine
+        );
 
-                    return scene;
-                    
-                };
-                
-            }
-         
-            
-            export default new NormalScene();
+        verticalBlurPostProcessPass.onApply = function (effect) {
+            HV = 0.0;
+            effect.setFloat("HV", HV);
+            effect.setInt("kernelSize", kernelSize);
+        }
+        // scene.clearColor = new BABYLON.Color4(0.2, 0.2, 0.2, 1); //Apply on composite Pass
 
+        return scene;
+    };
+}
+
+export default new NormalScene();
