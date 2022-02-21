@@ -7,16 +7,19 @@ uniform sampler2D textureSampler;
 uniform sampler2D normalTexture;
 uniform sampler2D depthTexture;
 uniform sampler2D noiseTexture;
+
 uniform float radius;
 uniform int numSamples;
 uniform vec3 kernelSphere[16]; 
 uniform float fallOff;
 uniform float area;
 uniform float bias;
-uniform mat4 projection; 
-uniform mat4 view; 
 uniform float near;
 uniform float far;
+
+uniform mat4 projection; 
+uniform mat4 view; 
+
 vec3 getRandomVec3(vec2 uv){
     return normalize( 
         vec3( texture2D(noiseTexture, uv).rg * 2.0 - 1.0,

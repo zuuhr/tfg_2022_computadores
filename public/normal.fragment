@@ -1,29 +1,13 @@
 precision highp float;
 
-//Uniforms
-uniform sampler2D textureSampler;
-uniform sampler2D normalTexture;
-uniform mat4 worldViewProjection;
-uniform mat4 worldView;
-uniform mat4 view;
-uniform mat4 world;
+// uniform mat4 worldView;
 
-//Varying
-varying vec2 vUV;
 varying vec3 vNormal;
-varying vec4 vPosition;
+
 void main(void){
-    //AQUI EL FALLO
-    //model space normal
-    vec4 normal = vec4(vNormal, 1);
-    normal.z = -normal.z;
-    //world space normal (world matrix is model matrix on unity)
-    // vec4 SP_Normal = transpose(inverse(worldView)) * normal;  //NO SE ME VUELVE A OLVIDAR 
-    vec4 SP_Normal = normal; 
-    gl_FragColor = SP_Normal;
-    
-    //Fin Normal 
-    // gl_FragColor = worldView * vPosition;
-    
-    // gl_FragColor = texture2D(textureSampler, vUV);
+    //view space normal
+    vec4 VS_normal = vec4(vNormal, 1);
+    VS_normal.z = -VS_normal.z;
+    //Normal matrix: transpose(inverse(worldView)) * normal; 
+    gl_FragColor = VS_normal;
 }
