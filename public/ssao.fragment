@@ -30,93 +30,97 @@ vec3 getRandomVec3(vec2 uv){
 vec3 viewSpaceToWorldSpace(vec3 v){
     return (inverse(view) * vec4(v, 1.0)).xyz;
 }
+
+vec3 clipSpaceToViewSpace(vec3 v){
+    mat4 projectionIN = inverse(projection);
+    vec4 v4 = (projectionIN * vec4(v, 1.0));
+    v4.w = 1.0 / v4.w;
+    v4.x *= v4.w;
+    v4.y *= v4.w;
+    v4.z *= v4.w;
+    return v4.xyz;
+}
+
 void main(void){
     //Linear depth from texture
     float depth = texture2D(depthTexture, vUV).r;
     //Clip Space Fragment Position (z scale in ss and vs don't vary) screen space (* 2.0 - 1.0) - > clip space
     vec3 fragPos = vec3(vUV * 2.0 - 1.0, depth);
-    
+
     //View Space Fragment Position 
     mat4 projectionIN = inverse(projection);
-    vec3 VS_fragPos = (projectionIN * vec4(fragPos, 1.0)).xyz;
+    // vec4 v4 = (projectionIN * vec4(v, 1.0));
+    vec4 test = (projectionIN * vec4(fragPos, 1.0));
+    vec3 VS_fragPos = test.xyz;
+    // VS_fragPos.x *= test.w;
+    // VS_fragPos.y *= test.w;
+    // VS_fragPos.z *= test.w;
+
     //to readjust depth add this: [MAYBE]
-    VS_fragPos.z = depth;
+    // VS_fragPos.z = depth;
                     
-    //View Space Normal
-    vec3 fragN = normalize(texture2D(normalTexture, vUV).xyz);
-    //Tangent Space randomVec
-    vec3 randomVec = getRandomVec3(vUV); 
-    // randomVec = vec3(1.0, 0.0, 0.0);
-    //Generate kernelSphere rotated along surface normal -> use TBN matrix 
-    vec3 tangent = normalize(randomVec - fragN * dot(randomVec, fragN));
-    //gram schmidt:
-    tangent = normalize(tangent - fragN * dot(tangent, fragN));
-    vec3 binormal = cross(fragN, tangent);
-    mat3 TBN = mat3(tangent, binormal, fragN);
+    //View Space Normal DONT NORMALIZE
+    vec3 fragN = texture2D(normalTexture, vUV).xyz;
+    
     //The further the distance the bigger the radius in view space 
     float scale = radius / depth; 
-    //fixed for testing reasons
-    //TODO: tamaño maximo
-    // scale = radius;
+
     float ao = 0.0;
     float prueba = 0.0;
-    vec3 pruebaVec = binormal;
+    vec3 pruebaVec = vec3(0.0, 0.0, 0.0);
     for(int i = 0; i < numSamples; i++){
         
-            //Sample position in view space
-        vec3 samplePosition =  TBN * kernelSphere[i];
-            //offset sample position with current fragment
-        samplePosition = VS_fragPos + samplePosition * scale;
-            //samplePos depth in View Space
-        float sampleDepth = samplePosition.z; //Z aleatoria
-            //view -> (projection) -> clip -> (/ 2.0 + 0.5) -> screen
-        vec2 tempCoord = (projection * vec4(samplePosition, 1.0)).xy / 2.0 + 0.5;
-            //offset Depth is the real depth of the screen fragment at the same xy of samplePosition
-        float offsetDepth = texture2D(depthTexture, tempCoord).r;
-            //difference is comparison of the depth of the sample and the depth at that position 
+        //Sample position in view space
+        //offset sample position with current fragment
+        // samplePosition = VS_fragPos + samplePosition * scale;
+        vec3 samplePosition = VS_fragPos + kernelSphere[i] * scale;
         
-        ////BEGIN [MY CODE]
-        ////comprobar si está ocluido el sample Position
-        // float difference = sampleDepth - offsetDepth; 
-        // float rangeCheck =  smoothstep(0.0, 1.0, scale / abs(difference)); //rehacer
-        // rangeCheck = 1.0 - offsetDepth; //rehacer
-        // ao += difference > 0.01 ? 1.0 * rangeCheck : 0.0;
-        ////END [MY CODE]
-        ////BEGIN [GAMEDEV CODE]
+
+        //view -> (projection) -> clip -> (/ 2.0 + 0.5) -> screen
+        vec2 sampleCoord = (projection * vec4(samplePosition, 1.0)).xy / 2.0 + 0.5;
+        //offset Depth is the real depth of the screen fragment at the same xy of samplePosition
+        float offsetDepth = texture2D(depthTexture, sampleCoord).r;
+        //difference is comparison of the depth of the sample and the depth at that position 
+
         ////comprobar si la superficie ocluye hacia el fragmento 
-        vec3 VS_offsetPos = vec3(samplePosition.xy, offsetDepth);
+
+        vec3 SS_offsetPos = vec3(sampleCoord.xy, offsetDepth);
+        vec3 CS_offsetPos = SS_offsetPos / 2.0 + 0.5; 
+        vec3 VS_offsetPos = clipSpaceToViewSpace(CS_offsetPos);
+
         vec3 diff = VS_offsetPos - VS_fragPos;
-        diff = -diff;
+   
+        float d = length(diff);
         vec3 v = normalize(diff);
-        float d = length(diff) * scale;
-        d = length(diff);
+        // float d = length(diff) * scale;
+
         // ao += max(0.0, dot(fragN, v) - bias) * (1.0 / (1.0 + d));
-        float rangeCheck =  1.0 / (1.0 + d * 200.0);
-        ao += max(0.0, dot(fragN, v) ) * rangeCheck - bias;
-        
-        
-        ////END [GAMEDEV CODE]
-        prueba = max(0.0, dot(fragN, v) - bias);
-        prueba =  dot(fragN, v);
-        // pruebaVec = samplePosition;
-        pruebaVec = v * 0.5 + 0.5;
-        // if(i == numSamples - 2){
-        //     pruebaVec = v;
-        // }
+        float rangeCheck =  1.0 / (1.0 + d);
+        // ao += max(0.0, dot(fragN, v) ) * rangeCheck - bias;
+        // ao += max(0.0, dot(fragN, v) ) ;
+
+        //aver
+        ao += d > 0.5 ? 1.0 : 0.0;
+   
+
+        pruebaVec = SS_offsetPos;
+        prueba = d;
+
+    
     }
     // prueba /= float(numSamples);
     ao /= float(numSamples);
     // ao *= 500.0;
     ao = 1.0 - ao;
-    // pruebaVec = VS_fragPos;
+
     
-    // gl_FragColor = vec4(depth, depth, depth, 1);
+    gl_FragColor = vec4(depth, depth, depth, 1);
     // gl_FragColor = texture2D(noiseTexture, vUV);
     // gl_FragColor = vec4(tangent, 1);
     // gl_FragColor = vec4(binormal, 1);
     // gl_FragColor = vec4(fragN, 1);
     // gl_FragColor = texture2D(textureSampler, vUV);
     gl_FragColor = vec4(ao, ao, ao, 1);
-    gl_FragColor = vec4(pruebaVec, 1);
-    // gl_FragColor = vec4(prueba, prueba, prueba, 1);
+    // gl_FragColor = vec4(pruebaVec, 1);
+    gl_FragColor = vec4(prueba, prueba, prueba, 1);
 }

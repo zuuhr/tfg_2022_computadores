@@ -1,13 +1,19 @@
 precision highp float;
 
-// uniform mat4 worldView;
+uniform mat4 worldViewProjection;
+uniform mat4 worldView;
+uniform mat4 world;
+uniform mat4 view;
 
 varying vec3 vNormal;
 
 void main(void){
     //view space normal
-    vec4 VS_normal = vec4(vNormal, 1);
-    VS_normal.z = -VS_normal.z;
+    vec4 VS_normal = vec4(vNormal, 0.0);
+    // float algo = VS_normal.z;
+    // VS_normal = - VS_normal;
     //Normal matrix: transpose(inverse(worldView)) * normal; 
+    // vec4 WS_normal = transpose(inverse(worldView)) * VS_normal;
+    // gl_FragColor = vec4(VS_normal.x, VS_normal.y, algo, 0.0);
     gl_FragColor = VS_normal;
 }
