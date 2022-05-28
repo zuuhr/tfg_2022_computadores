@@ -13,9 +13,9 @@ varying vec3 vNormal;
 varying vec2 vUV;
 
 void main() {
-    vPosition = vec4(position, 1.0);
+    vec4 p = vec4(position, 1.0);
+    vPosition = p;
     vNormal = (transpose(inverse(worldView)) * vec4(normal, 0.0)).xyz;
-    // vNormal = (transpose(inverse(worldViewProjection)) * vec4(normal, 0.0)).xyz;
     vNormal.z = - vNormal.z;
     vNormal = (vNormal + 1.0) / 2.0;
     vUV = uv;
