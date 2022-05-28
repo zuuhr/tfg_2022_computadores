@@ -42,26 +42,35 @@ vec3 clipSpaceToViewSpace(vec3 v){
 }
 
 void main(void){
-    //Linear depth from texture
+    // Linear depth from texture
     float depth = texture2D(depthTexture, vUV).r;
-    //Clip Space Fragment Position (z scale in ss and vs don't vary) screen space (* 2.0 - 1.0) - > clip space
-    vec3 fragPos = vec3(vUV * 2.0 - 1.0, depth);
+    // Screen Space Fragment Position (z scale in ss and vs don't vary) screen space (* 2.0 - 1.0) - > clip space
+    vec3 CS_fragPos = vec3(vUV * 2.0 - 1.0, depth);
 
-    //View Space Fragment Position 
+    // View Space Fragment Position 
     mat4 projectionIN = inverse(projection);
-    // vec4 v4 = (projectionIN * vec4(v, 1.0));
-    vec4 test = (projectionIN * vec4(fragPos, 1.0));
-    vec3 VS_fragPos = test.xyz;
-    // VS_fragPos.x *= test.w;
-    // VS_fragPos.y *= test.w;
-    // VS_fragPos.z *= test.w;
+    vec4 VS_fragPos4 = (projectionIN * vec4(CS_fragPos, 1.0));
+    vec3 VS_fragPos = VS_fragPos4.xyz / VS_fragPos4.w;
+    // vec3 VS_fragPos = VS_fragPos4.xyz;
+    // Camera is looking at z negativas
+    VS_fragPos.z = -VS_fragPos.z;
 
-    //to readjust depth add this: [MAYBE]
-    // VS_fragPos.z = depth;
                     
-    //View Space Normal DONT NORMALIZE
+    // View Space Normal DONT NORMALIZE
     vec3 fragN = texture2D(normalTexture, vUV).xyz;
-    
+    fragN = fragN * 2.0 - 1.0;
+
+    // TBN:
+    //Tangent Space randomVec
+    vec3 randomVec = getRandomVec3(vUV); 
+    // randomVec = vec3(1.0, 0.0, 0.0);
+    //Generate kernelSphere rotated along surface normal -> use TBN matrix 
+    vec3 tangent = normalize(randomVec - fragN * dot(randomVec, fragN));
+    //gram schmidt:
+    // tangent = normalize(tangent - fragN * dot(tangent, fragN));
+    vec3 binormal = cross(fragN, tangent);
+    mat3 TBN = mat3(tangent, binormal, fragN);
+
     //The further the distance the bigger the radius in view space 
     float scale = radius / depth; 
 
@@ -70,49 +79,60 @@ void main(void){
     vec3 pruebaVec = vec3(0.0, 0.0, 0.0);
     for(int i = 0; i < numSamples; i++){
         
-        //Sample position in view space
-        //offset sample position with current fragment
-        // samplePosition = VS_fragPos + samplePosition * scale;
-        vec3 samplePosition = VS_fragPos + kernelSphere[i] * scale;
-        
+        // Sample position in view space
+        // offset sample position with current fragment
+        // vec3 samplePosition = VS_fragPos + kernelSphere[i] * scale;
+        vec3 samplePosition =  TBN * kernelSphere[i];
+        samplePosition = VS_fragPos + samplePosition * scale;
+         
 
         //view -> (projection) -> clip -> (/ 2.0 + 0.5) -> screen
-        vec2 sampleCoord = (projection * vec4(samplePosition, 1.0)).xy / 2.0 + 0.5;
+        samplePosition.z = -samplePosition.z;
+        vec4 tempCoord = (projection * vec4(samplePosition, 1.0));
+        tempCoord.xy /= tempCoord.w; 
+        vec2 sampleCoord = tempCoord.xy * 0.5 + 0.5;
         //offset Depth is the real depth of the screen fragment at the same xy of samplePosition
-        float offsetDepth = texture2D(depthTexture, sampleCoord).r;
+        float offsetDepth = texture2D(depthTexture, sampleCoord).r ;
         //difference is comparison of the depth of the sample and the depth at that position 
 
         ////comprobar si la superficie ocluye hacia el fragmento 
 
-        vec3 SS_offsetPos = vec3(sampleCoord.xy, offsetDepth);
-        vec3 CS_offsetPos = SS_offsetPos / 2.0 + 0.5; 
-        vec3 VS_offsetPos = clipSpaceToViewSpace(CS_offsetPos);
+        vec3 CS_offsetPos = vec3(sampleCoord.xy * 0.5 + 0.5, offsetDepth);
+        // vec3 VS_offsetPos = clipSpaceToViewSpace(CS_offsetPos);
+        vec4 VS_offsetPos4 = (projectionIN * vec4(CS_offsetPos, 1.0));
+        vec3 VS_offsetPos = VS_offsetPos4.xyz / VS_offsetPos4.w;
+        VS_offsetPos.z = -VS_offsetPos.z;
+        
+        pruebaVec = VS_offsetPos;
+        // pruebaVec = samplePosition;
+        // pruebaVec = VS_fragPos;
 
         vec3 diff = VS_offsetPos - VS_fragPos;
    
         float d = length(diff);
-        vec3 v = normalize(diff);
-        // float d = length(diff) * scale;
-
-        // ao += max(0.0, dot(fragN, v) - bias) * (1.0 / (1.0 + d));
+        vec3 v = diff;
+ 
         float rangeCheck =  1.0 / (1.0 + d);
         // ao += max(0.0, dot(fragN, v) ) * rangeCheck - bias;
-        // ao += max(0.0, dot(fragN, v) ) ;
+        float test = dot(fragN, fragN);
 
+        //z test ao
+        ao += VS_fragPos.z - VS_offsetPos.z < -0.05 ? 1.0 : 0.0;  
+        
         //aver
-        ao += d > 0.5 ? 1.0 : 0.0;
+        // ao += d > 0.5 ? 1.0 : 0.0;
    
 
-        pruebaVec = SS_offsetPos;
-        prueba = d;
-
-    
+        prueba = test;
+        prueba = -VS_offsetPos.z  / 10.0;
+        // prueba = - VS_fragPos.z / 10.0;
     }
+
     // prueba /= float(numSamples);
     ao /= float(numSamples);
     // ao *= 500.0;
     ao = 1.0 - ao;
-
+    // pruebaVec = VS_fragPos;
     
     gl_FragColor = vec4(depth, depth, depth, 1);
     // gl_FragColor = texture2D(noiseTexture, vUV);
@@ -122,5 +142,5 @@ void main(void){
     // gl_FragColor = texture2D(textureSampler, vUV);
     gl_FragColor = vec4(ao, ao, ao, 1);
     // gl_FragColor = vec4(pruebaVec, 1);
-    gl_FragColor = vec4(prueba, prueba, prueba, 1);
+    // gl_FragColor = vec4(prueba, prueba, prueba, 1);
 }

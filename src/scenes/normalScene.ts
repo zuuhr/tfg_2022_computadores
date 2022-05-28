@@ -96,6 +96,7 @@ export class NormalScene implements CreateSceneClass {
             }
         );
 
+        //documentar esto:  
         var normalRenderTarget = new BABYLON.RenderTargetTexture('normal texture', canvas, scene, false);
         normalRenderTarget.activeCamera = camera;
         scene.customRenderTargets.push(normalRenderTarget);
@@ -109,7 +110,7 @@ export class NormalScene implements CreateSceneClass {
         var kernelSphere = new BABYLON.SmartArray(16);
         //radius around the analyzed pixel. Default: 0.0006
         // var radius = 0.01;
-        var radius = 0.01;
+        var radius = 0.002;
         //Bias default: 0.025
         var bias = 0.02;
         //base color of SSAO
@@ -182,7 +183,7 @@ export class NormalScene implements CreateSceneClass {
         //     effect.setMatrix("view", camera.getViewMatrix(true));
 
         //     effect.setFloat("near", camera.minZ);
-        //     effect.setFloat("far", camera.maxZ);
+        //     effect.setFloat("far", camera.maxZ);<
             
         // }
 
@@ -214,8 +215,8 @@ export class NormalScene implements CreateSceneClass {
         var blurKernelSize = 9;
         var hBlurPass = new BABYLON.BlurPostProcess("Horizontal Blur Post Process", new BABYLON.Vector2(1, 0), blurKernelSize, 0.5, camera);
         var vBlurPass = new BABYLON.BlurPostProcess("Vertical Blur Post Process", new BABYLON.Vector2(0, 1), blurKernelSize, 0.5, camera);
-        hBlurPass.apply;
-        vBlurPass.apply;
+        // hBlurPass.apply;
+        // vBlurPass.apply;
 
         return scene;
     };
