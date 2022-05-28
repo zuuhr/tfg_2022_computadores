@@ -112,25 +112,36 @@ void main(void){
         float d = length(diff);
         vec3 v = diff;
  
-        float rangeCheck =  1.0 / (1.0 + d);
+        // float rangeCheck =  1.0 / (1.0 + d);
         // ao += max(0.0, dot(fragN, v) ) * rangeCheck - bias;
-        float test = dot(fragN, fragN);
+        // ao += dot(fragN, v);
 
         //z test ao
-        ao += VS_fragPos.z - VS_offsetPos.z < -0.05 ? 1.0 : 0.0;  
-        
+        // float rangeCheck = abs(VS_fragPos.z - VS_offsetPos.z) < scale * 5.0 ? 1.0 : 0.0;
+        // ao += VS_fragPos.z - VS_offsetPos.z < -0.002 ? 1.0 * rangeCheck: 0.0;  
+        //tengo la sensación de que la profundidad no es lineal?
+
+
+
+        //z test ao VERSION INVENTADA 
+        vec3 offsetN = texture2D(normalTexture, sampleCoord).xyz  * 2.0 - 1.0;
+        float angle = 1.0 - max(0.0, dot(fragN, offsetN));
+        float rangeCheck = abs(VS_fragPos.z - VS_offsetPos.z) < scale * 5.0 ? 1.0 : 0.0;
+        ao += VS_fragPos.z - VS_offsetPos.z < -0.002 ? 1.0 * rangeCheck * angle: 0.0; 
+        // problema con los bordes de la pantalla pero yujuu
+        // algun artefacto
+
+
         //aver
         // ao += d > 0.5 ? 1.0 : 0.0;
    
 
-        prueba = test;
-        prueba = -VS_offsetPos.z  / 10.0;
+        // prueba = dot(fragN, fragN);
+        // prueba = -VS_offsetPos.z  / 10.0;
         // prueba = - VS_fragPos.z / 10.0;
     }
 
-    // prueba /= float(numSamples);
     ao /= float(numSamples);
-    // ao *= 500.0;
     ao = 1.0 - ao;
     // pruebaVec = VS_fragPos;
     

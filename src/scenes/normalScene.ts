@@ -38,6 +38,18 @@ export class NormalScene implements CreateSceneClass {
         var sphere = BABYLON.Mesh.CreateSphere("sphere", 5, 20, scene);
         sphere.position = new BABYLON.Vector3(0, 2.5, 20);
 
+        var numBoxes = 4;
+        for (var i = 0; i < numBoxes; i++) {
+            for (var j = 0; j < numBoxes; j++) {
+                var box = BABYLON.Mesh.CreateBox("box" + i + " - " + j, 5, scene);
+                box.position = new BABYLON.Vector3(i * 10, 2.5, j * 10);
+                box.rotation = new BABYLON.Vector3(i, i * j, j);
+                boxes.push(box);
+
+                // if (j % 2 == 0) box.material = boxMaterial;
+                // else box.material = boxMaterial2;
+            }
+        }
 
         // var sponza = BABYLON.SceneLoader.ImportMeshAsync("", "/assets/", "sponza.babylon"); 
         // var a =   ((await sponza).meshes as unknown as BABYLON.Mesh[]);
@@ -110,7 +122,7 @@ export class NormalScene implements CreateSceneClass {
         var kernelSphere = new BABYLON.SmartArray(16);
         //radius around the analyzed pixel. Default: 0.0006
         // var radius = 0.01;
-        var radius = 0.002;
+        var radius = 0.003;
         //Bias default: 0.025
         var bias = 0.02;
         //base color of SSAO
@@ -142,8 +154,8 @@ export class NormalScene implements CreateSceneClass {
 
         //Noise texture
         var noiseTexture = new BABYLON.Texture("Noise.png", scene);
-        noiseTexture.wrapU = BABYLON.Texture.WRAP_ADDRESSMODE;
-        noiseTexture.wrapV = BABYLON.Texture.WRAP_ADDRESSMODE;
+        noiseTexture.wrapU = BABYLON.Texture.CLAMP_ADDRESSMODE;
+        noiseTexture.wrapV = BABYLON.Texture.CLAMP_ADDRESSMODE;
 
         //Depth texture
         var depthTexture = scene.enableDepthRenderer(camera, false).getDepthMap(); //false to get linear depht, true to get logarithmic depth
@@ -215,8 +227,8 @@ export class NormalScene implements CreateSceneClass {
         var blurKernelSize = 9;
         var hBlurPass = new BABYLON.BlurPostProcess("Horizontal Blur Post Process", new BABYLON.Vector2(1, 0), blurKernelSize, 0.5, camera);
         var vBlurPass = new BABYLON.BlurPostProcess("Vertical Blur Post Process", new BABYLON.Vector2(0, 1), blurKernelSize, 0.5, camera);
-        // hBlurPass.apply;
-        // vBlurPass.apply;
+        hBlurPass.apply;
+        vBlurPass.apply;
 
         return scene;
     };
