@@ -13,17 +13,11 @@ varying vec3 vNormal;
 varying vec2 vUV;
 
 void main() {
-    vec4 p = vec4( position, 1.0 );
-    vPosition = p;
-    
-    vec4 test = vec4(normal.x, normal.y, -normal.z, 0.0);
-     test = vec4(-normal.x, normal.y, normal.z, 0.0);
+    vPosition = vec4(position, 1.0);
     vNormal = (transpose(inverse(worldView)) * vec4(normal, 0.0)).xyz;
-    // vNormal = (transpose(inverse(worldViewProjection)) * test).xyz;
+    // vNormal = (transpose(inverse(worldViewProjection)) * vec4(normal, 0.0)).xyz;
     vNormal.z = - vNormal.z;
-    //world space normal
-    // vNormal = (transpose(inverse(world)) * vec4(normal, 0.0)).xyz;
-    // vNormal =  * normal;
+    vNormal = (vNormal + 1.0) / 2.0;
     vUV = uv;
     gl_Position = worldViewProjection * p;
 }
