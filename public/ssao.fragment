@@ -75,6 +75,7 @@ void main(void){
     float scale = radius / depth; 
 
     float ao = 0.0;
+    float weight = 0.0;
     float prueba = 0.0;
     vec3 pruebaVec = vec3(0.0, 0.0, 0.0);
     for(int i = 0; i < numSamples; i++){
@@ -84,21 +85,23 @@ void main(void){
         // vec3 samplePosition = VS_fragPos + kernelSphere[i] * scale;
         vec3 samplePosition =  TBN * kernelSphere[i];
         samplePosition = VS_fragPos + samplePosition * scale;
-         
-
         //view -> (projection) -> clip -> (/ 2.0 + 0.5) -> screen
         samplePosition.z = -samplePosition.z;
         vec4 tempCoord = (projection * vec4(samplePosition, 1.0));
         tempCoord.xy /= tempCoord.w; 
         vec2 sampleCoord = tempCoord.xy * 0.5 + 0.5;
+
+        //always sampling from within the screen
+        sampleCoord.x = clamp(sampleCoord.x, 0.0, 1.0);
+        sampleCoord.y = clamp(sampleCoord.y, 0.0, 1.0);
+
         //offset Depth is the real depth of the screen fragment at the same xy of samplePosition
         float offsetDepth = texture2D(depthTexture, sampleCoord).r ;
         //difference is comparison of the depth of the sample and the depth at that position 
 
         ////comprobar si la superficie ocluye hacia el fragmento 
-
         vec3 CS_offsetPos = vec3(sampleCoord.xy * 0.5 + 0.5, offsetDepth);
-        // vec3 VS_offsetPos = clipSpaceToViewSpace(CS_offsetPos);
+        
         vec4 VS_offsetPos4 = (projectionIN * vec4(CS_offsetPos, 1.0));
         vec3 VS_offsetPos = VS_offsetPos4.xyz / VS_offsetPos4.w;
         VS_offsetPos.z = -VS_offsetPos.z;
@@ -107,27 +110,12 @@ void main(void){
         // pruebaVec = samplePosition;
         // pruebaVec = VS_fragPos;
 
-        vec3 diff = VS_offsetPos - VS_fragPos;
-   
-        float d = length(diff);
-        vec3 v = diff;
- 
-        // float rangeCheck =  1.0 / (1.0 + d);
-        // ao += max(0.0, dot(fragN, v) ) * rangeCheck - bias;
-        // ao += dot(fragN, v);
-
-        //z test ao
-        // float rangeCheck = abs(VS_fragPos.z - VS_offsetPos.z) < scale * 5.0 ? 1.0 : 0.0;
-        // ao += VS_fragPos.z - VS_offsetPos.z < -0.002 ? 1.0 * rangeCheck: 0.0;  
-        //tengo la sensación de que la profundidad no es lineal?
-
-
-
         //z test ao VERSION INVENTADA 
         vec3 offsetN = texture2D(normalTexture, sampleCoord).xyz  * 2.0 - 1.0;
-        float angle = 1.0 - max(0.0, dot(fragN, offsetN));
-        float rangeCheck = abs(VS_fragPos.z - VS_offsetPos.z) < scale * 5.0 ? 1.0 : 0.0;
-        ao += VS_fragPos.z - VS_offsetPos.z < -0.002 ? 1.0 * rangeCheck * angle: 0.0; 
+        float angle = 1.0 - max(0.0, abs(dot(fragN, offsetN)));
+        float zDiff = VS_fragPos.z - VS_offsetPos.z;
+        float rangeCheckAndWeight = abs(zDiff) < scale ? 1.0 - (-zDiff / scale) : 0.0;
+        ao += zDiff < - bias ? 1.0 * rangeCheckAndWeight * angle : 0.0; 
         // problema con los bordes de la pantalla pero yujuu
         // algun artefacto
 
@@ -142,10 +130,11 @@ void main(void){
     }
 
     ao /= float(numSamples);
-    ao = 1.0 - ao;
+    ao = clamp(ao, 0.0, 1.0);
+    // ao = 1.0 - ao;
     // pruebaVec = VS_fragPos;
     
-    gl_FragColor = vec4(depth, depth, depth, 1);
+    // gl_FragColor = vec4(depth, depth, depth, 1);
     // gl_FragColor = texture2D(noiseTexture, vUV);
     // gl_FragColor = vec4(tangent, 1);
     // gl_FragColor = vec4(binormal, 1);
@@ -154,4 +143,6 @@ void main(void){
     gl_FragColor = vec4(ao, ao, ao, 1);
     // gl_FragColor = vec4(pruebaVec, 1);
     // gl_FragColor = vec4(prueba, prueba, prueba, 1);
+
+    // gl_FragColor = texture2D(textureSampler, vUV) - vec4(ao, ao, ao, 0);
 }

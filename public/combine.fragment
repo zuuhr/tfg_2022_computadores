@@ -1,0 +1,14 @@
+precision highp float;
+        
+varying vec2 vUV;
+varying vec4 vPosition;
+
+uniform sampler2D defaultSampler;
+uniform sampler2D ssaoSampler;
+
+void main(void){
+    vec4 color = texture2D(defaultSampler, vUV) - texture2D(ssaoSampler, vUV);
+    gl_FragColor = vec4(color.rgb, 1.0);
+    // gl_FragColor = texture2D(ssaoSampler, vUV);
+    // gl_FragColor = texture2D(defaultSampler, vUV);
+}

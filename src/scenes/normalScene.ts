@@ -87,8 +87,13 @@ export class NormalScene implements CreateSceneClass {
 
         var l = new BABYLON.Vector3(0, -1, -1);
         l.normalize();
+
+        //Lighting
         var dirLight = new BABYLON.DirectionalLight("dirLight", l, scene);
-        
+
+        var ambient = new BABYLON.HemisphericLight("ambient1", new BABYLON.Vector3(0, 1, 0), scene);
+    ambient.intensity = 0.5;
+
         var shader = "";
 
         //Normal Texture Pass
@@ -117,14 +122,17 @@ export class NormalScene implements CreateSceneClass {
         normalRenderTarget.render();
         normalRenderTarget.setMaterialForRendering(boxes, normalTextureMaterial);
 
+        normalRenderTarget.wrapU = BABYLON.Texture.MIRROR_ADDRESSMODE;
+        normalRenderTarget.wrapV = BABYLON.Texture.MIRROR_ADDRESSMODE;
+
         //SSAO Pass
         var numSamples = 16;
         var kernelSphere = new BABYLON.SmartArray(16);
         //radius around the analyzed pixel. Default: 0.0006
         // var radius = 0.01;
-        var radius = 0.003;
+        var radius = 0.002;
         //Bias default: 0.025
-        var bias = 0.02;
+        var bias = 0.002;
         //base color of SSAO
         var base = 0.5;
         var kernelSphereData2: number[] = [];
@@ -154,21 +162,37 @@ export class NormalScene implements CreateSceneClass {
 
         //Noise texture
         var noiseTexture = new BABYLON.Texture("Noise.png", scene);
-        noiseTexture.wrapU = BABYLON.Texture.CLAMP_ADDRESSMODE;
-        noiseTexture.wrapV = BABYLON.Texture.CLAMP_ADDRESSMODE;
+        noiseTexture.wrapU = BABYLON.Texture.MIRROR_ADDRESSMODE;
+        noiseTexture.wrapV = BABYLON.Texture.MIRROR_ADDRESSMODE;
 
         //Depth texture
         var depthTexture = scene.enableDepthRenderer(camera, false).getDepthMap(); //false to get linear depht, true to get logarithmic depth
+        depthTexture.wrapU = BABYLON.Texture.MIRROR_ADDRESSMODE;
+        depthTexture.wrapV = BABYLON.Texture.MIRROR_ADDRESSMODE;
+
+        //PrePostProcess shader
+        shader = (await fetch("default.fragment").then(response => response.text())).toString();
+        BABYLON.Effect.ShadersStore.defaultPostProcessFragmentShader = shader;
+        var defaultPostProcessPass = new BABYLON.PostProcess(
+            'Default Post Process shader',
+            'defaultPostProcess',
+            [],
+            [],
+            1.0,
+            camera,
+            BABYLON.Texture.BILINEAR_SAMPLINGMODE,
+            engine
+        );
+        defaultPostProcessPass.onApply = function (effect) {}
 
         //SSAO Shader
-        
         shader = (await fetch("ssao.fragment").then(response => response.text())).toString();
-        BABYLON.Effect.ShadersStore.normalPostProcessFragmentShader = shader;
+        BABYLON.Effect.ShadersStore.ssaoPostProcessFragmentShader = shader;
 
 
-        var normalPostProcessPass = new BABYLON.PostProcess(
+        var ssaoPostProcessPass = new BABYLON.PostProcess(
             'Normal Post Process shader',
-            'normalPostProcess',
+            'ssaoPostProcess',
             ['radius', 'numSamples', 'kernelSphere', 'fallOff', 'projection', 'view', 'bias', 'dirLight'],
             ['normalTexture', 'depthTexture', 'noiseTexture'],
             1.0,
@@ -177,30 +201,8 @@ export class NormalScene implements CreateSceneClass {
             engine
         );
 
-        // scene.clearColor = new BABYLON.Color4(0.2, 0.2, 0.2, 1);
-        
-        //SSAO
-        // normalPostProcessPass.onApply = function (effect) {
-        //     effect.setFloat("radius", radius);
-        //     effect.setInt("numSamples", numSamples);
-        //     effect.setArray3("kernelSphere", kernelSphereData2);
-        //     effect.setFloat("bias", bias);
-
-        //     effect.setTexture("normalTexture", normalRenderTarget);
-        //     effect.setTexture("depthTexture", depthTexture);
-        //     effect.setTexture("noiseTexture", noiseTexture);
-
-        //     //we need to set uniform matrices in PostProcess shaders
-        //     effect.setMatrix("projection", camera.getProjectionMatrix(true));
-        //     effect.setMatrix("view", camera.getViewMatrix(true));
-
-        //     effect.setFloat("near", camera.minZ);
-        //     effect.setFloat("far", camera.maxZ);<
-            
-        // }
-
         //SSDO
-        normalPostProcessPass.onApply = function (effect) {
+        ssaoPostProcessPass.onApply = function (effect) {
             effect.setFloat("radius", radius);
             effect.setInt("numSamples", numSamples);
             effect.setArray3("kernelSphere", kernelSphereData2);
@@ -214,8 +216,8 @@ export class NormalScene implements CreateSceneClass {
             effect.setMatrix("projection", camera.getProjectionMatrix(true));
             effect.setMatrix("view", camera.getViewMatrix(true));
 
-            effect.setFloat("near", camera.minZ);
-            effect.setFloat("far", camera.maxZ);
+            // effect.setFloat("near", camera.minZ);
+            // effect.setFloat("far", camera.maxZ);
             
             //SSDO
             // effect.setFloat3("dirLight", -dirLight.direction._x, -dirLight.direction._y, -dirLight.direction._z);
@@ -229,6 +231,26 @@ export class NormalScene implements CreateSceneClass {
         var vBlurPass = new BABYLON.BlurPostProcess("Vertical Blur Post Process", new BABYLON.Vector2(0, 1), blurKernelSize, 0.5, camera);
         hBlurPass.apply;
         vBlurPass.apply;
+
+        //Combine Pass
+        shader = (await fetch("combine.fragment").then(response => response.text())).toString();
+        BABYLON.Effect.ShadersStore.combinePostProcessFragmentShader = shader;
+        
+        var combinePostProcessPass = new BABYLON.PostProcess(
+            'Combine Post Process shader',
+            'combinePostProcess',
+            [],
+            ['ssaoSampler', 'defaultSampler'],
+            1.0,
+            camera,
+            BABYLON.Texture.BILINEAR_SAMPLINGMODE,
+            engine
+            );
+            
+        combinePostProcessPass.onApply = function (effect) {
+            effect.setTextureFromPostProcess("defaultSampler", defaultPostProcessPass);
+            effect.setTextureFromPostProcess("ssaoSampler", vBlurPass);
+        }
 
         return scene;
     };
