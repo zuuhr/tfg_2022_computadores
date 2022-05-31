@@ -16,14 +16,16 @@ export class NormalScene implements CreateSceneClass {
         camera.maxZ = 200; //Tweak to see better xd
         camera.minZ = 0.1;
 
-        //Geometry
-        var planeH = BABYLON.MeshBuilder.CreatePlane("planeH", { height: 60, width: 60, sideOrientation: 2 });
-        planeH.lookAt(new BABYLON.Vector3(0, 1, 0));
-        var planeF = BABYLON.MeshBuilder.CreatePlane("planeF", { height: 60, width: 60, sideOrientation: 2 });
-        planeF.lookAt(new BABYLON.Vector3(0, 0, -1));
-        var planeR = BABYLON.MeshBuilder.CreatePlane("planeR", { height: 60, width: 60, sideOrientation: 2 });
-        planeR.lookAt(new BABYLON.Vector3(1, 0, 0));
-        // Create some boxes and deactivate lighting (specular color and back faces)
+        //Materials
+        var whiteMaterial = new BABYLON.StandardMaterial("white", scene);
+        whiteMaterial.diffuseTexture = new BABYLON.Texture("./whiteTexture.png", scene);
+
+        var cyanMaterial = new BABYLON.StandardMaterial("cyan", scene);
+        cyanMaterial.diffuseTexture = new BABYLON.Texture("./cyanTexture.png", scene);
+
+        var greenMaterial = new BABYLON.StandardMaterial("green", scene);
+        greenMaterial.diffuseTexture = new BABYLON.Texture("./greenTexture.png", scene);
+
         var boxMaterial = new BABYLON.StandardMaterial("boxMaterail", scene);
         boxMaterial.diffuseTexture = new BABYLON.Texture("./ground.jpg", scene);
         boxMaterial.specularColor = BABYLON.Color3.Black();
@@ -33,10 +35,22 @@ export class NormalScene implements CreateSceneClass {
         boxMaterial2.diffuseTexture = new BABYLON.Texture("./ground2.jpg", scene);
         boxMaterial2.specularColor = BABYLON.Color3.Black();
 
+        //Geometry
         var boxes: BABYLON.Mesh[] = [];
- 
+
+        var planeH = BABYLON.MeshBuilder.CreatePlane("planeH", { height: 60, width: 60, sideOrientation: 2 });
+        planeH.lookAt(new BABYLON.Vector3(0, 1, 0));
+        planeH.material = whiteMaterial;
+        var planeF = BABYLON.MeshBuilder.CreatePlane("planeF", { height: 60, width: 60, sideOrientation: 2 });
+        planeF.lookAt(new BABYLON.Vector3(0, 0, -1));
+        planeF.material = whiteMaterial;
+        var planeR = BABYLON.MeshBuilder.CreatePlane("planeR", { height: 60, width: 60, sideOrientation: 2 });
+        planeR.lookAt(new BABYLON.Vector3(1, 0, 0));
+        planeR.material = whiteMaterial;
+        
         var sphere = BABYLON.Mesh.CreateSphere("sphere", 5, 20, scene);
         sphere.position = new BABYLON.Vector3(0, 2.5, 20);
+        sphere.material = whiteMaterial;
 
         var numBoxes = 4;
         for (var i = 0; i < numBoxes; i++) {
@@ -46,8 +60,8 @@ export class NormalScene implements CreateSceneClass {
                 box.rotation = new BABYLON.Vector3(i, i * j, j);
                 boxes.push(box);
 
-                // if (j % 2 == 0) box.material = boxMaterial;
-                // else box.material = boxMaterial2;
+                if (i % 2 == 0) box.material = greenMaterial;
+                else box.material = cyanMaterial;
             }
         }
 
@@ -57,6 +71,7 @@ export class NormalScene implements CreateSceneClass {
         //     // element.scaling(0.5,0.5,0.5);
         //     boxes.push(element); 
         // });
+        
         boxes.push(sphere);
         boxes.push(planeH);
         boxes.push(planeF);
@@ -69,21 +84,9 @@ export class NormalScene implements CreateSceneClass {
             // pivot.rotate(new BABYLON.Vector3(0,1,0), angle, BABYLON.Space.WORLD);
         });
 
-        // var numBoxes = 2;
-        // for (var i = 0; i < numBoxes; i++) {
-        //     for (var j = 0; j < numBoxes; j++) {
-        //         var box = BABYLON.Mesh.CreateBox("box" + i + " - " + j, 5, scene);
-        //         box.position = new BABYLON.Vector3(i * 5, 2.5, j * 5);
-        //         box.rotation = new BABYLON.Vector3(i, i * j, j);
-        //         boxes.push(box);
-
-        //         // if (j % 2 == 0) box.material = boxMaterial;
-        //         // else box.material = boxMaterial2;
-        //     }
-        // }
-        boxes.forEach(element => {
-            element.material = boxMaterial;
-        });
+        // boxes.forEach(element => {
+        //     element.material = boxMaterial;
+        // });
 
         var l = new BABYLON.Vector3(0, -1, -1);
         l.normalize();
@@ -186,7 +189,7 @@ export class NormalScene implements CreateSceneClass {
         defaultPostProcessPass.onApply = function (effect) {}
 
         //SSAO Shader
-        shader = (await fetch("ssao.fragment").then(response => response.text())).toString();
+        shader = (await fetch("ssdo.fragment").then(response => response.text())).toString();
         BABYLON.Effect.ShadersStore.ssaoPostProcessFragmentShader = shader;
 
 
@@ -220,7 +223,7 @@ export class NormalScene implements CreateSceneClass {
             // effect.setFloat("far", camera.maxZ);
             
             //SSDO
-            // effect.setFloat3("dirLight", -dirLight.direction._x, -dirLight.direction._y, -dirLight.direction._z);
+            effect.setFloat3("dirLight", -dirLight.direction._x, -dirLight.direction._y, -dirLight.direction._z);
         }
         
 
