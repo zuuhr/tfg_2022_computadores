@@ -1,0 +1,14 @@
+precision highp float;
+
+uniform mat4 worldViewProjection;
+uniform mat4 worldView;
+uniform mat4 world;
+uniform mat4 view;
+
+varying vec3 vNormal;
+varying vec4 vPosition;
+varying vec4 vPos;
+
+void main(void){
+    gl_FragColor =  worldView * vPos;
+}

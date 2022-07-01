@@ -10,7 +10,8 @@ export class NormalScene implements CreateSceneClass {
         scene.clearColor = new BABYLON.Color4(0, 0, 0, 1);
 
         // Create camera
-        var camera = new BABYLON.FreeCamera("camera", new BABYLON.Vector3(29, 13, 23), scene);
+        // var camera = new BABYLON.FreeCamera("camera", new BABYLON.Vector3(29, 13, 23), scene);
+        var camera = new BABYLON.FreeCamera("camera", new BABYLON.Vector3(1, 0, 5), scene);
         camera.setTarget(new BABYLON.Vector3(0, 0, 0));
         camera.attachControl(canvas);
         camera.maxZ = 200; //Tweak to see better xd
@@ -38,13 +39,13 @@ export class NormalScene implements CreateSceneClass {
         //Geometry
         var boxes: BABYLON.Mesh[] = [];
 
-        var planeH = BABYLON.MeshBuilder.CreatePlane("planeH", { height: 60, width: 60, sideOrientation: 2 });
+        var planeH = BABYLON.MeshBuilder.CreatePlane("planeH", { height: 10, width: 10, sideOrientation: 2 });
         planeH.lookAt(new BABYLON.Vector3(0, 1, 0));
         planeH.material = whiteMaterial;
-        var planeF = BABYLON.MeshBuilder.CreatePlane("planeF", { height: 60, width: 60, sideOrientation: 2 });
+        var planeF = BABYLON.MeshBuilder.CreatePlane("planeF", { height: 10, width: 10, sideOrientation: 2 });
         planeF.lookAt(new BABYLON.Vector3(0, 0, -1));
         planeF.material = whiteMaterial;
-        var planeR = BABYLON.MeshBuilder.CreatePlane("planeR", { height: 60, width: 60, sideOrientation: 2 });
+        var planeR = BABYLON.MeshBuilder.CreatePlane("planeR", { height: 10, width: 10, sideOrientation: 2 });
         planeR.lookAt(new BABYLON.Vector3(1, 0, 0));
         planeR.material = whiteMaterial;
         
@@ -55,8 +56,8 @@ export class NormalScene implements CreateSceneClass {
         var numBoxes = 4;
         for (var i = 0; i < numBoxes; i++) {
             for (var j = 0; j < numBoxes; j++) {
-                var box = BABYLON.Mesh.CreateBox("box" + i + " - " + j, 5, scene);
-                box.position = new BABYLON.Vector3(i * 10, 2.5, j * 10);
+                var box = BABYLON.Mesh.CreateBox("box" + i + " - " + j, 1, scene);
+                box.position = new BABYLON.Vector3(i * 2.25, 0.5, j * 1.25);
                 box.rotation = new BABYLON.Vector3(i, i * j, j);
                 boxes.push(box);
 
@@ -99,8 +100,47 @@ export class NormalScene implements CreateSceneClass {
 
         var shader = "";
 
-        //Normal Texture Pass
-        shader = (await fetch("normal.vertex").then(response => response.text())).toString();
+
+        
+        //View Space Position Texture Pass
+        shader = (await fetch("position.vertex").then(response => response.text())).toString();
+        BABYLON.Effect.ShadersStore.positionTextureVertexShader = shader;
+        
+        shader = (await fetch("position.fragment").then(response => response.text())).toString();
+        BABYLON.Effect.ShadersStore.positionTextureFragmentShader = shader;
+        
+        var positionTextureMaterial = new BABYLON.ShaderMaterial(
+            'position texture material',
+            scene,
+            'positionTexture',
+            {
+                attributes: ['position', 'normal', 'uv'],
+                uniforms: ['worldViewProjection', 'view', 'worldView', 'world']
+            }
+            );
+            
+            //documentar esto:  
+            var positionRenderTarget = new BABYLON.RenderTargetTexture('position texture', canvas, scene, false, true, 2);
+            positionRenderTarget.activeCamera = camera;
+            // positionRenderTarget.textureType = 1;
+            scene.customRenderTargets.push(positionRenderTarget);
+            positionRenderTarget.renderList = boxes;
+            
+            positionRenderTarget.render();
+            positionRenderTarget.setMaterialForRendering(boxes, positionTextureMaterial);
+            
+            positionRenderTarget.wrapU = BABYLON.Texture.CLAMP_ADDRESSMODE;
+            positionRenderTarget.wrapV = BABYLON.Texture.CLAMP_ADDRESSMODE;
+            
+            // var buffer = new BABYLON.Buffer(engine, new BABYLON.DataBuffer(), true);
+            // var a = new BABYLON.DynamicFloat32Array(canvas.height * canvas.width);
+            // buffer.create(a.subarray(0, 0));
+            // BABYLON.Effect.bind(a);
+            // var tex = new BABYLON.Texture("", engine, false, false, 0, null, null, buffer, true, Float32Array)
+
+            
+            //Normal Texture Pass
+            shader = (await fetch("normal.vertex").then(response => response.text())).toString();
         BABYLON.Effect.ShadersStore.normalTextureVertexShader = shader;
 
         shader = (await fetch("normal.fragment").then(response => response.text())).toString();
@@ -117,7 +157,7 @@ export class NormalScene implements CreateSceneClass {
         );
 
         //documentar esto:  
-        var normalRenderTarget = new BABYLON.RenderTargetTexture('normal texture', canvas, scene, false);
+        var normalRenderTarget = new BABYLON.RenderTargetTexture('normal texture', canvas, scene, false, true, 2);
         normalRenderTarget.activeCamera = camera;
         scene.customRenderTargets.push(normalRenderTarget);
         normalRenderTarget.renderList = boxes;
@@ -125,26 +165,26 @@ export class NormalScene implements CreateSceneClass {
         normalRenderTarget.render();
         normalRenderTarget.setMaterialForRendering(boxes, normalTextureMaterial);
 
-        normalRenderTarget.wrapU = BABYLON.Texture.MIRROR_ADDRESSMODE;
-        normalRenderTarget.wrapV = BABYLON.Texture.MIRROR_ADDRESSMODE;
+        normalRenderTarget.wrapU = BABYLON.Texture.CLAMP_ADDRESSMODE;
+        normalRenderTarget.wrapV = BABYLON.Texture.CLAMP_ADDRESSMODE;
 
         //SSAO Pass
         var numSamples = 16;
         var kernelSphere = new BABYLON.SmartArray(16);
         //radius around the analyzed pixel. Default: 0.0006
         // var radius = 0.01;
-        var radius = 0.002;
+        var radius = 0.0002;
         //Bias default: 0.025
         var bias = 0.002;
         //base color of SSAO
         var base = 0.5;
         var kernelSphereData2: number[] = [];
         for (let index = 0; index < numSamples; index++) {
-            var sample = new BABYLON.Vector3(
+            var sample = new BABYLON.Vector2(
                 Math.random() * 2.0 - 1.0,
-                Math.random() * 2.0 - 1.0,
-                // Math.random());
                 Math.random() * 2.0 - 1.0);
+                // Math.random());
+                // Math.random() * 2.0 - 1.0);
             sample.normalize();
             var scale = index / numSamples;
             //improve distribution
@@ -153,13 +193,13 @@ export class NormalScene implements CreateSceneClass {
             //TEST
             sample.x = +sample.x.toFixed(3);
             sample.y = +sample.y.toFixed(3);
-            sample.z = +sample.z.toFixed(3);
+            // sample.z = +sample.z.toFixed(3);
             //sample.scale(BABYLON.Scalar.RandomRange(0, 1));
             console.log(sample.toString())
             kernelSphere.push(sample);
             kernelSphereData2.push(parseFloat(sample.x.toString()));
             kernelSphereData2.push(parseFloat(sample.y.toString()));
-            kernelSphereData2.push(parseFloat(sample.z.toString()));
+            // kernelSphereData2.push(parseFloat(sample.z.toString()));
         }
         var kernelSphereData = kernelSphere.data.map(Number);
 
@@ -187,9 +227,11 @@ export class NormalScene implements CreateSceneClass {
             engine
         );
         defaultPostProcessPass.onApply = function (effect) {}
+ 
+        scene.clearColor = new BABYLON.Color4(0, 0, 0, 1);
 
         //SSAO Shader
-        shader = (await fetch("ssdo.fragment").then(response => response.text())).toString();
+        shader = (await fetch("ssao_renderTarget.fragment").then(response => response.text())).toString();
         BABYLON.Effect.ShadersStore.ssaoPostProcessFragmentShader = shader;
 
 
@@ -197,7 +239,7 @@ export class NormalScene implements CreateSceneClass {
             'Normal Post Process shader',
             'ssaoPostProcess',
             ['radius', 'numSamples', 'kernelSphere', 'fallOff', 'projection', 'view', 'bias', 'dirLight'],
-            ['normalTexture', 'depthTexture', 'noiseTexture'],
+            ['normalTexture', 'depthTexture', 'noiseTexture', 'positionTexture'],
             1.0,
             camera,
             BABYLON.Texture.BILINEAR_SAMPLINGMODE,
@@ -208,11 +250,12 @@ export class NormalScene implements CreateSceneClass {
         ssaoPostProcessPass.onApply = function (effect) {
             effect.setFloat("radius", radius);
             effect.setInt("numSamples", numSamples);
-            effect.setArray3("kernelSphere", kernelSphereData2);
+            effect.setArray2("kernelSphere", kernelSphereData2);
             effect.setFloat("bias", bias);
 
             effect.setTexture("normalTexture", normalRenderTarget);
             effect.setTexture("depthTexture", depthTexture);
+            effect.setTexture("positionTexture", positionRenderTarget);
             effect.setTexture("noiseTexture", noiseTexture);
 
             //we need to set uniform matrices in PostProcess shaders

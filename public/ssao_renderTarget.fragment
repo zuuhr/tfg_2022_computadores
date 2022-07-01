@@ -1,0 +1,119 @@
+precision highp float;
+        
+varying vec2 vUV;
+varying vec4 vPosition;
+
+uniform sampler2D textureSampler;
+uniform sampler2D normalTexture;
+uniform sampler2D depthTexture;
+uniform sampler2D noiseTexture;
+uniform sampler2D positionTexture;
+
+uniform float radius;
+uniform int numSamples;
+uniform vec2 kernelSphere[16]; 
+uniform float fallOff;
+uniform float area;
+uniform float bias;
+uniform float near;
+uniform float far;
+
+uniform mat4 projection; 
+uniform mat4 view; 
+
+vec3 getRandomVec3(vec2 uv){
+    return normalize( 
+        vec3( texture2D(noiseTexture, uv).rg * 2.0 - 1.0,
+        0.0) 
+    );
+}
+
+vec3 viewSpaceToWorldSpace(vec3 v){
+    return (inverse(view) * vec4(v, 1.0)).xyz;
+}
+
+vec3 clipSpaceToViewSpace(vec3 v){
+    mat4 projectionIN = inverse(projection);
+    vec4 v4 = (projectionIN * vec4(v, 1.0));
+    v4.xyz /= v4.w;
+ 
+    return v4.xyz;
+}
+
+void main(void){
+    // Linear depth from texture
+    float depth = texture2D(depthTexture, vUV).r;
+    vec3 VS_fragPos = texture2D(positionTexture, vUV).xyz;             
+
+    // View Space Normal DONT NORMALIZE
+    vec3 fragN = texture2D(normalTexture, vUV).xyz;
+    fragN = fragN * 2.0 - 1.0;
+
+    //The further the distance the bigger the radius in view space 
+    float scale = radius / depth; 
+
+    float ao = 0.0;
+    float weight = 0.0;
+    float weight2 = 0.0;
+    float prueba = 0.0;
+    vec3 pruebaVec = vec3(0.0, 0.0, 0.0);
+    for(int i = 0; i < numSamples; i++){
+        // vec2 sampleCoord = kernelSphere[i].xy * scale * 10.0;
+        vec2 sampleCoord = vec2(0.05, 0.0);
+        vec3 VS_offsetPos = texture2D(positionTexture, vUV + sampleCoord).xyz;
+
+        vec3 diff = VS_offsetPos - VS_fragPos;
+        float offsetNAngle = dot(fragN, normalize(diff));
+        weight += offsetNAngle;
+        float zDiff = VS_offsetPos.z - VS_fragPos.z;
+        // float rangeCheckAndWeight = abs(zDiff) < 0.1 ? 1.0 - (-zDiff / scale) : 0.0;
+        // float rangeCheckAndWeight = length(diff) < 1.0 ? 1.0 : 0.0;
+        float d = length(diff);
+        float rangeCheckAndWeight = (1.0 / (1.0 + d));
+        // float rangeCheckAndWeight = smoothstep(0.0, 1.0, scale / abs(zDiff));
+
+        // float rangeCheckAndWeight = length(diff) < 10.0 ? 1.0  - (-zDiff / scale) : 0.0;
+        ao += zDiff > 0.1 ? 1.0 * rangeCheckAndWeight * offsetNAngle : 0.0; 
+        // ao += zDiff < 0.0 ? 1.0 * offsetNAngle + 0.5: 0.0; 
+        // ao += zDiff < 0.0 + 0.4 ? 1.0 * rangeCheckAndWeight * offsetNAngle : 0.0; 
+        // problema con los bordes de la pantalla pero yujuu
+        
+        pruebaVec = VS_offsetPos;
+        // pruebaVec = VS_fragPos;
+        // pruebaVec = normalize(diff);
+        // pruebaVec = fragN;
+
+        prueba = dot(fragN, fragN);
+        // prueba = zDiff;
+        prueba = offsetNAngle;
+        prueba = rangeCheckAndWeight;
+        // prueba = meow;
+      
+    }
+    weight /= float(numSamples);
+
+    // Weight es la media de los valores del producto escalar de la normal y posicion
+    prueba = weight;
+
+
+    ao /= float(numSamples);
+    // ao = clamp(ao, 0.0, 1.0);
+    // ao = 1.0 - ao;
+    
+    gl_FragColor = vec4(depth, depth, depth, 1);
+    gl_FragColor = vec4(VS_fragPos.z, VS_fragPos.z, VS_fragPos.z, 1);
+    // gl_FragColor = texture2D(noiseTexture, vUV);
+    // gl_FragColor = vec4(tangent, 1);
+    // gl_FragColor = vec4(binormal, 1);
+    gl_FragColor = vec4(fragN, 1);
+    // gl_FragColor = texture2D(textureSampler, vUV);
+    gl_FragColor = vec4(ao, ao, ao, 1);
+    if (pruebaVec.x == 0.0 && pruebaVec.y == 0.0 && pruebaVec.z == 0.0){
+        pruebaVec = vec3(1.0, 1.0, 0.0);
+    }
+    gl_FragColor = vec4(pruebaVec, 1);
+    // gl_FragColor = vec4(prueba, -prueba, 0.0, 1);
+    // gl_FragColor = vec4(prueba, offsetNAngleNeg, 0.0, 1);
+    // gl_FragColor = texture2D(textureSampler, vUV) - vec4(ao, ao, ao, 0);
+    // gl_FragColor = texture2D(positionTexture, vUV);
+}
