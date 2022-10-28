@@ -58,13 +58,16 @@ void main(void){
     float prueba = 0.0;
     vec3 pruebaVec = vec3(0.0, 0.0, 0.0);
     for(int i = 0; i < numSamples; i++){
-        // vec2 sampleCoord = kernelSphere[i].xy * scale * 10.0;
-        vec2 sampleCoord = vec2(0.05, 0.0);
+        vec2 sampleCoord = kernelSphere[i].xy * scale;
+        // vec2 sampleCoord = kernelSphere[i].xy * scale;
+        // vec2 sampleCoord = vec2(0.05, 0.0);
         vec3 VS_offsetPos = texture2D(positionTexture, vUV + sampleCoord).xyz;
 
         vec3 diff = VS_offsetPos - VS_fragPos;
         float offsetNAngle = dot(fragN, normalize(diff));
         weight += offsetNAngle;
+
+
         float zDiff = VS_offsetPos.z - VS_fragPos.z;
         // float rangeCheckAndWeight = abs(zDiff) < 0.1 ? 1.0 - (-zDiff / scale) : 0.0;
         // float rangeCheckAndWeight = length(diff) < 1.0 ? 1.0 : 0.0;
@@ -80,13 +83,16 @@ void main(void){
         
         pruebaVec = VS_offsetPos;
         // pruebaVec = VS_fragPos;
+
+        
         // pruebaVec = normalize(diff);
         // pruebaVec = fragN;
+        pruebaVec = normalize(diff);
 
         prueba = dot(fragN, fragN);
-        // prueba = zDiff;
+        prueba = zDiff;
         prueba = offsetNAngle;
-        prueba = rangeCheckAndWeight;
+        // prueba = rangeCheckAndWeight;
         // prueba = meow;
       
     }
@@ -107,12 +113,13 @@ void main(void){
     // gl_FragColor = vec4(binormal, 1);
     gl_FragColor = vec4(fragN, 1);
     // gl_FragColor = texture2D(textureSampler, vUV);
-    gl_FragColor = vec4(ao, ao, ao, 1);
-    if (pruebaVec.x == 0.0 && pruebaVec.y == 0.0 && pruebaVec.z == 0.0){
-        pruebaVec = vec3(1.0, 1.0, 0.0);
-    }
-    gl_FragColor = vec4(pruebaVec, 1);
+    // gl_FragColor = vec4(ao, ao, ao, 1);
+    // if (pruebaVec.x == 0.0 && pruebaVec.y == 0.0 && pruebaVec.z == 0.0){
+    //     pruebaVec = vec3(1.0, 1.0, 0.0);
+    // }
+    // gl_FragColor = vec4(pruebaVec, 1);
     // gl_FragColor = vec4(prueba, -prueba, 0.0, 1);
+    // gl_FragColor = vec4(prueba, prueba, prueba, 1);
     // gl_FragColor = vec4(prueba, offsetNAngleNeg, 0.0, 1);
     // gl_FragColor = texture2D(textureSampler, vUV) - vec4(ao, ao, ao, 0);
     // gl_FragColor = texture2D(positionTexture, vUV);

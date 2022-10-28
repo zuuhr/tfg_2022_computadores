@@ -2,7 +2,7 @@ import { CreateSceneClass } from "../createScene";
 import * as BABYLON from 'babylonjs';
 
 export class NormalScene implements CreateSceneClass {
-    createScene = async (engine: BABYLON.Engine, canvas: HTMLCanvasElement):
+    createScene = async (engine: BABYLON.Engine, canvas : HTMLCanvasElement):
         Promise<BABYLON.Scene> => {
 
         // Create scene
@@ -16,6 +16,15 @@ export class NormalScene implements CreateSceneClass {
         camera.attachControl(canvas);
         camera.maxZ = 200; //Tweak to see better xd
         camera.minZ = 0.1;
+
+        // Make camera orthographic
+        // camera.mode = BABYLON.Camera.ORTHOGRAPHIC_CAMERA;
+        // var distance = 20;	
+        // var aspect = canvas.height / canvas.width; 
+        // camera.orthoLeft = -distance/2;
+        // camera.orthoRight = distance / 2;
+        // camera.orthoBottom = camera.orthoLeft * aspect;
+        // camera.orthoTop = camera.orthoRight * aspect;
 
         //Materials
         var whiteMaterial = new BABYLON.StandardMaterial("white", scene);

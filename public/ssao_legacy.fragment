@@ -1,0 +1,133 @@
+precision highp float;
+        
+varying vec2 vUV;
+varying vec4 vPosition;
+
+uniform sampler2D textureSampler;
+uniform sampler2D normalTexture;
+uniform sampler2D depthTexture;
+uniform sampler2D noiseTexture;
+
+uniform float radius;
+uniform int numSamples;
+uniform vec3 kernelSphere[16]; 
+uniform float fallOff;
+uniform float area;
+uniform float bias;
+uniform float near;
+uniform float far;
+
+uniform mat4 projection; 
+uniform mat4 view; 
+
+vec3 getRandomVec3(vec2 uv){
+    return normalize( 
+        vec3( texture2D(noiseTexture, uv).rg * 2.0 - 1.0,
+        0.0) 
+    );
+}
+
+vec3 viewSpaceToWorldSpace(vec3 v){
+    return (inverse(view) * vec4(v, 1.0)).xyz;
+}
+
+vec3 clipSpaceToViewSpace(vec3 v){
+    mat4 projectionIN = inverse(projection);
+    vec4 v4 = (projectionIN * vec4(v, 1.0));
+    v4.w = 1.0 / v4.w;
+    v4.x *= v4.w;
+    v4.y *= v4.w;
+    v4.z *= v4.w;
+    return v4.xyz;
+}
+
+void main(void){
+    //Linear depth from texture
+    float depth = texture2D(depthTexture, vUV).r;
+    //Clip Space Fragment Position (z scale in ss and vs don't vary) screen space (* 2.0 - 1.0) - > clip space
+    vec3 fragPos = vec3(vUV * 2.0 - 1.0, depth);
+
+    //View Space Fragment Position 
+    mat4 projectionIN = inverse(projection);
+    // vec4 v4 = (projectionIN * vec4(v, 1.0));
+    vec4 test = (projectionIN * vec4(fragPos, 1.0));
+    vec3 VS_fragPos = test.xyz;
+    // VS_fragPos.x *= test.w;
+    // VS_fragPos.y *= test.w;
+    // VS_fragPos.z *= test.w;
+
+    //to readjust depth add this: [MAYBE]
+    // VS_fragPos.z = depth;
+                    
+    //View Space Normal DONT NORMALIZE
+    vec3 fragN = texture2D(normalTexture, vUV).xyz;
+    fragN = fragN * 2.0 - 1.0;
+
+    //The further the distance the bigger the radius in view space 
+    float scale = radius / depth; 
+
+    float ao = 0.0;
+    float prueba = 0.0;
+    vec3 pruebaVec = vec3(0.0, 0.0, 0.0);
+    for(int i = 0; i < numSamples; i++){
+        
+        //Sample position in view space
+        //offset sample position with current fragment
+        // samplePosition = VS_fragPos + samplePosition * scale;
+        vec3 samplePosition = VS_fragPos + kernelSphere[i] * scale;
+        
+
+        //view -> (projection) -> clip -> (/ 2.0 + 0.5) -> screen
+        vec2 sampleCoord = (projection * vec4(samplePosition, 1.0)).xy / 2.0 + 0.5;
+        //offset Depth is the real depth of the screen fragment at the same xy of samplePosition
+        float offsetDepth = texture2D(depthTexture, sampleCoord).r;
+        //difference is comparison of the depth of the sample and the depth at that position 
+
+        ////comprobar si la superficie ocluye hacia el fragmento 
+
+        vec3 SS_offsetPos = vec3(sampleCoord.xy, offsetDepth);
+        vec3 CS_offsetPos = SS_offsetPos / 2.0 + 0.5; 
+        vec3 VS_offsetPos = clipSpaceToViewSpace(CS_offsetPos);
+
+        vec3 diff = VS_offsetPos - VS_fragPos;
+   
+        float d = length(diff);
+        vec3 v = diff;
+        // float d = length(diff) * scale;
+
+        // ao += max(0.0, dot(fragN, v) - bias) * (1.0 / (1.0 + d));
+        float rangeCheck =  1.0 / (1.0 + d);
+        ao += max(0.0, dot(fragN, v) ) * rangeCheck - bias;
+        // ao += max(0.0, dot(fragN, v) - bias) ;
+        // ao += max(0.0, dot(fragN, v) - bias);
+
+        float test = dot(fragN, fragN);
+        // vec3 f = normalize(fragN);
+        // test = max(0.0, dot(f, f));
+        
+        //aver
+        // ao += d > 0.5 ? 1.0 : 0.0;
+   
+
+        pruebaVec = SS_offsetPos;
+        prueba = d;
+        prueba = test;
+
+    
+    }
+    // prueba /= float(numSamples);
+    ao /= float(numSamples);
+    // ao *= 500.0;
+    ao = 1.0 - ao;
+
+    
+    gl_FragColor = vec4(depth, depth, depth, 1);
+    // gl_FragColor = texture2D(noiseTexture, vUV);
+    // gl_FragColor = vec4(tangent, 1);
+    // gl_FragColor = vec4(binormal, 1);
+    // gl_FragColor = vec4(fragN, 1);
+    // gl_FragColor = texture2D(textureSampler, vUV);
+    gl_FragColor = vec4(ao, ao, ao, 1);
+    // gl_FragColor = vec4(pruebaVec, 1);
+    // gl_FragColor = vec4(prueba, prueba, prueba, 1);
+}

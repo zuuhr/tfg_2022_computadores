@@ -31,9 +31,19 @@ vec3 viewSpaceToWorldSpace(vec3 v){
     return (inverse(view) * vec4(v, 1.0)).xyz;
 }
 
+vec3 clipSpaceToViewSpace(vec3 v){
+    mat4 projectionIN = inverse(projection);
+    vec4 v4 = (projectionIN * vec4(v, 1.0));
+    v4.w = 1.0 / v4.w;
+    v4.x *= v4.w;
+    v4.y *= v4.w;
+    v4.z *= v4.w;
+    return v4.xyz;
+}
+
 void main(void){
     //Linear depth from texture
-    float depth = texture2D(depthTexture, vUV).r * 2.0 - 1.0;
+    float depth = texture2D(depthTexture, vUV).r;
     //Clip Space Fragment Position (z scale in ss and vs don't vary) screen space (* 2.0 - 1.0) - > clip space
     vec3 fragPos = vec3(vUV * 2.0 - 1.0, depth);
     
@@ -57,7 +67,7 @@ void main(void){
     vec3 binormal = cross(fragN, tangent);
     mat3 TBN = mat3(tangent, binormal, fragN);
     //The further the distance the bigger the radius in view space 
-    float scale = radius / depth; 
+    float scale = radius * 0.5 / depth; 
     //fixed for testing reasons
     //TODO: tamaño maximo
     // scale = radius;
@@ -70,6 +80,7 @@ void main(void){
         vec3 samplePosition =  TBN * kernelSphere[i];
         //offset sample position with current fragment
         samplePosition = VS_fragPos + samplePosition * scale;
+        samplePosition = VS_fragPos + kernelSphere[i] * scale;
         //samplePos depth in View Space
         float sampleDepth = samplePosition.z; //Z aleatoria
         //view -> (projection) -> clip -> (/ 2.0 + 0.5) -> screen
@@ -98,7 +109,8 @@ void main(void){
         // ao += max(0.0, dot(fragN, v) - bias) * (1.0 / (1.0 + d));
         // float rangeCheck =  1.0 / (1.0 + d * 200.0);
         float rangeCheck =  1.0 / (1.0 + d);
-        ao += max(0.0, dot(fragN, v) ) * rangeCheck - bias;
+        // ao += max(0.0, dot(fragN, v) ) * rangeCheck - bias;
+        ao += max(0.0, dot(fragN, v) ) ;
         ////END [GAMEDEV CODE]
 
 
