@@ -1,5 +1,6 @@
 import { CreateSceneClass } from "../createScene";
 import * as BABYLON from 'babylonjs';
+import { postprocessVertexShader } from "babylonjs/Shaders/postprocess.vertex";
 
 export class NormalScene implements CreateSceneClass {
     createScene = async (engine: BABYLON.Engine, canvas : HTMLCanvasElement):
@@ -11,10 +12,10 @@ export class NormalScene implements CreateSceneClass {
 
         // Create camera
         // var camera = new BABYLON.FreeCamera("camera", new BABYLON.Vector3(29, 13, 23), scene);
-        var camera = new BABYLON.FreeCamera("camera", new BABYLON.Vector3(1, 0, 5), scene);
+        var camera = new BABYLON.FreeCamera("camera", new BABYLON.Vector3(1, 0, 1), scene);
         camera.setTarget(new BABYLON.Vector3(0, 0, 0));
         camera.attachControl(canvas);
-        camera.maxZ = 200; //Tweak to see better xd
+        camera.maxZ = 50; //Tweak to see better xd
         camera.minZ = 0.1;
 
         // Make camera orthographic
@@ -105,7 +106,7 @@ export class NormalScene implements CreateSceneClass {
         var dirLight = new BABYLON.DirectionalLight("dirLight", l, scene);
 
         var ambient = new BABYLON.HemisphericLight("ambient1", new BABYLON.Vector3(0, 1, 0), scene);
-    ambient.intensity = 0.5;
+        ambient.intensity = 0.5;
 
         var shader = "";
 
@@ -204,7 +205,7 @@ export class NormalScene implements CreateSceneClass {
             sample.y = +sample.y.toFixed(3);
             // sample.z = +sample.z.toFixed(3);
             //sample.scale(BABYLON.Scalar.RandomRange(0, 1));
-            console.log(sample.toString())
+            // console.log(sample.toString())
             kernelSphere.push(sample);
             kernelSphereData2.push(parseFloat(sample.x.toString()));
             kernelSphereData2.push(parseFloat(sample.y.toString()));
@@ -235,15 +236,68 @@ export class NormalScene implements CreateSceneClass {
             BABYLON.Texture.BILINEAR_SAMPLINGMODE,
             engine
         );
-        defaultPostProcessPass.onApply = function (effect) {}
+        // defaultPostProcessPass.onApply = function (effect) {}
  
+        
         scene.clearColor = new BABYLON.Color4(0, 0, 0, 1);
+        
+        // // //Geometry Buffer
+        // shader = (await fetch("positionBuffer.fragment").then(response => response.text())).toString();
+        // BABYLON.Effect.ShadersStore.gBufferFragmentShader = shader;
 
+        // const geometryBuffer = scene.enableGeometryBufferRenderer();
+        // if(geometryBuffer){
+        //     if(geometryBuffer.isSupported){
+        //         geometryBuffer.enablePosition = true;
+        //         // geometryBuffer.enableReflectivity = true;
+        //         console.log("Yup");
+        //     }
+        // }
+
+        
+
+        // var positionPostProcessPass = new BABYLON.PostProcess(
+        //     'Position Post Process Shader',
+        //     'gBuffer',
+        //     [],
+        //     ["positionSampler"],
+        //     1.0,
+        //     null,
+        //     3,
+        //     engine,
+        //     true
+        //     )
+
+        // positionPossProcessPass.onApply = function (effect){
+        //     if(geometryBuffer){
+        //         const positionIndex = geometryBuffer.getTextureIndex(BABYLON.GeometryBufferRenderer.POSITION_TEXTURE_TYPE);
+        //         effect.setTexture("positionSampler", geometryBuffer.getGBuffer().textures[positionIndex]);
+                
+        //     }
+        //     console.log("Test");
+        // };
+
+        // if(geometryBuffer){
+        //     const positionIndex = geometryBuffer.getTextureIndex(BABYLON.GeometryBufferRenderer.POSITION_TEXTURE_TYPE);
+        //     BABYLON
+        //     // var ab = new BABYLON.CreateImageDataArrayBufferViews();
+        //     // const data =  geometryBuffer.getGBuffer().textures[positionIndex].readPixels(0, 0, ab, true, true);
+          
+        //     // if(data)
+        //     // console.log(geometryBuffer.getGBuffer().textures[positionIndex].readPixels(0, 0, null, false, false));
+        // }
+        // BABYLON.Buffer.apply( () => geometryBuffer?.getGBuffer())
+
+    
+        scene.clearColor = new BABYLON.Color4(0, 0, 0, 1);
+        
+        
+        
         //SSAO Shader
         shader = (await fetch("ssao_renderTarget.fragment").then(response => response.text())).toString();
         BABYLON.Effect.ShadersStore.ssaoPostProcessFragmentShader = shader;
-
-
+        
+        
         var ssaoPostProcessPass = new BABYLON.PostProcess(
             'Normal Post Process shader',
             'ssaoPostProcess',
@@ -253,7 +307,7 @@ export class NormalScene implements CreateSceneClass {
             camera,
             BABYLON.Texture.BILINEAR_SAMPLINGMODE,
             engine
-        );
+            );
 
         //SSDO
         ssaoPostProcessPass.onApply = function (effect) {
@@ -261,16 +315,16 @@ export class NormalScene implements CreateSceneClass {
             effect.setInt("numSamples", numSamples);
             effect.setArray2("kernelSphere", kernelSphereData2);
             effect.setFloat("bias", bias);
-
+            
             effect.setTexture("normalTexture", normalRenderTarget);
             effect.setTexture("depthTexture", depthTexture);
             effect.setTexture("positionTexture", positionRenderTarget);
             effect.setTexture("noiseTexture", noiseTexture);
-
+            
             //we need to set uniform matrices in PostProcess shaders
             effect.setMatrix("projection", camera.getProjectionMatrix(true));
             effect.setMatrix("view", camera.getViewMatrix(true));
-
+            
             // effect.setFloat("near", camera.minZ);
             // effect.setFloat("far", camera.maxZ);
             
@@ -278,7 +332,7 @@ export class NormalScene implements CreateSceneClass {
             effect.setFloat3("dirLight", -dirLight.direction._x, -dirLight.direction._y, -dirLight.direction._z);
         }
         
-
+        
         //Blur Pass
         //Horizontal & Vertical
         var blurKernelSize = 9;
@@ -286,7 +340,9 @@ export class NormalScene implements CreateSceneClass {
         var vBlurPass = new BABYLON.BlurPostProcess("Vertical Blur Post Process", new BABYLON.Vector2(0, 1), blurKernelSize, 0.5, camera);
         hBlurPass.apply;
         vBlurPass.apply;
-
+        
+        scene.clearColor = new BABYLON.Color4(0, 0, 0, 1);
+        
         //Combine Pass
         shader = (await fetch("combine.fragment").then(response => response.text())).toString();
         BABYLON.Effect.ShadersStore.combinePostProcessFragmentShader = shader;
@@ -301,11 +357,22 @@ export class NormalScene implements CreateSceneClass {
             BABYLON.Texture.BILINEAR_SAMPLINGMODE,
             engine
             );
-            
-        combinePostProcessPass.onApply = function (effect) {
-            effect.setTextureFromPostProcess("defaultSampler", defaultPostProcessPass);
-            effect.setTextureFromPostProcess("ssaoSampler", vBlurPass);
-        }
+            //https://playground.babylonjs.com/#JAVY4F#5
+        
+        // scene.disableGeometryBufferRenderer();
+
+        // combinePostProcessPass.onApply = function (effect) {
+        //     effect.setTextureFromPostProcess("defaultSampler", defaultPostProcessPass);
+        //     effect.setTextureFromPostProcess("ssaoSampler", vBlurPass);
+        //     if(geometryBuffer){
+        //         const positionIndex = geometryBuffer.getTextureIndex(BABYLON.GeometryBufferRenderer.POSITION_TEXTURE_TYPE);
+        //         effect.setTexture("positionSampler", geometryBuffer.getGBuffer().textures[positionIndex]);
+        //         console.log("TEXTURA EN COMBINE");
+        //         // console.log(geometryBuffer.getGBuffer().textures[positionIndex].readPixels(0, 0, null, false, false));
+        //     }
+        // }
+        
+
 
         return scene;
     };
