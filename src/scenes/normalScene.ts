@@ -12,9 +12,10 @@ export class NormalScene implements CreateSceneClass {
 
         // Create camera
         // var camera = new BABYLON.FreeCamera("camera", new BABYLON.Vector3(29, 13, 23), scene);
-        var camera = new BABYLON.FreeCamera("camera", new BABYLON.Vector3(1, 0, 1), scene);
-        camera.setTarget(new BABYLON.Vector3(0, 0, 0));
-        camera.attachControl(canvas);
+        // var camera = new BABYLON.FreeCamera("camera", new BABYLON.Vector3(1, 0, 1), scene);
+        // camera.setTarget(new BABYLON.Vector3(0, 0, 0));
+        var camera = new BABYLON.FlyCamera("camera", new BABYLON.Vector3(0, 0, -1), scene );
+        camera.attachControl();
         camera.maxZ = 200; //Tweak to see better xd
         camera.minZ = 0.1;
 

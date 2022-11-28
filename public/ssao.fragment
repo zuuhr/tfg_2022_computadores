@@ -19,7 +19,9 @@ uniform float near;
 uniform float far;
 
 uniform mat4 projection; 
-uniform mat4 view; 
+uniform mat4 view;
+
+vec2 vec[8];
 
 vec3 VSPositionFromDepth(vec2 texCoord)
 {
@@ -38,6 +40,18 @@ vec3 VSPositionFromDepth(vec2 texCoord)
 }
 
 void main(void){
+
+    
+    vec[0] = vec2(1,0);
+    vec[1] = vec2(-1,0);
+    vec[2] = vec2(0,1);
+    vec[3] = vec2(0,-1);
+    vec[4] = vec2(1,1);
+    vec[5] = vec2(-1,1);
+    vec[6] = vec2(-1,-1);
+    vec[7] = vec2(1,-1);
+    
+
     vec3 VS_fragPos = VSPositionFromDepth(vUV);
 
     // View Space Normal DONT NORMALIZE
@@ -53,14 +67,14 @@ void main(void){
     vec3 pruebaVec = vec3(0.0, 0.0, 0.0);
     float temp = 0.0;
 
-    for(int i = 0; i < numSamples; i++){
-        vec2 sampleCoord = kernelSphere[i].xy * 0.01;
+    for(int i = 0; i < 8; i++){
+        vec2 sampleCoord = vec[i].xy * 0.01;
         vec3 VS_offsetPos = VSPositionFromDepth(vUV + sampleCoord);
 
         vec3 diff = VS_offsetPos - VS_fragPos;
         float offsetNAngle = dot(fragN, normalize(diff));
         temp += offsetNAngle;
-        ao += max(0.0,  offsetNAngle - bias);
+        ao += max(0.0,  offsetNAngle);
     }
 
     temp /= float(numSamples);
@@ -69,6 +83,6 @@ void main(void){
     ao /= float(numSamples);
     // ao = 1.0 - ao;
     gl_FragColor = vec4(ao, ao, ao, 1);
-    // gl_FragColor = vec4(pruebaVec, 1);
+    // gl_FragColor = vec4(fragN, 1);
     gl_FragColor = vec4(prueba, -prueba, 0.0, 1);
 }
