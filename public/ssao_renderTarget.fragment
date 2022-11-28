@@ -79,56 +79,49 @@ void main(void){
     float temp = 0.0;
 
     for(int i = 0; i < numSamples; i++){
-        vec2 sampleCoord = kernelSphere[i].xy * 0.005;
+        vec2 sampleCoord = kernelSphere[i].xy * 0.01;
         // vec2 sampleCoord = kernelSphere[i].xy * scale;
-        vec3 VS_offsetPos = texture2D(positionTexture, vUV + sampleCoord).xyz;
-        float offsetDepth = texture2D(depthTexture, vUV + sampleCoord).r;
-        VS_offsetPos.z = offsetDepth;
-        VS_offsetPos = VSPositionFromDepth(vUV + sampleCoord);
+        // vec3 VS_offsetPos = texture2D(positionTexture, vUV + sampleCoord).xyz;
+        // float offsetDepth = texture2D(depthTexture, vUV + sampleCoord).r;
+        // VS_offsetPos.z = offsetDepth;
+        vec3 VS_offsetPos = VSPositionFromDepth(vUV + sampleCoord);
 
         vec3 diff = VS_offsetPos - VS_fragPos;
         float offsetNAngle = dot(fragN, normalize(diff));
         temp += offsetNAngle;
 
-        float zDiff = VS_offsetPos.z - VS_fragPos.z;
+        // float zDiff = VS_offsetPos.z - VS_fragPos.z;
         // float rangeCheckAndWeight = abs(zDiff) < 0.1 ? 1.0 - (-zDiff / scale) : 0.0;
         // float rangeCheckAndWeight = length(diff) < 1.0 ? 1.0 : 0.0;
-        float d = length(diff);
-        float rangeCheckAndWeight = (1.0 / (1.0 + d));
+        // float d = length(diff);
+        // float rangeCheckAndWeight = (1.0 / (1.0 + d));
         // float rangeCheckAndWeight = smoothstep(0.0, 1.0, scale / abs(zDiff));
         // float rangeCheckAndWeight = length(diff) < 10.0 ? 1.0  - (-zDiff / scale) : 0.0;
-        ao += zDiff > 0.1 ? 1.0 * rangeCheckAndWeight * offsetNAngle : 0.0; 
-        // ao += zDiff < 0.0 ? 1.0 * offsetNAngle + 0.5: 0.0; 
-        // ao += zDiff < 0.0 + 0.4 ? 1.0 * rangeCheckAndWeight * offsetNAngle : 0.0; 
-        // problema con los bordes de la pantalla pero yujuu
+        // ao += zDiff > 0.1 ? 1.0 * rangeCheckAndWeight * offsetNAngle : 0.0;
+        ao += max(0.0,  offsetNAngle - bias);
+        
         
         // pruebaVec = VS_offsetPos;
         // pruebaVec = VS_fragPos;
         // pruebaVec = normalize(diff);
         // pruebaVec = fragN;
 
-        // prueba = dot(fragN, fragN);
-        // prueba = zDiff;
         // prueba = offsetNAngle;
-        // prueba = rangeCheckAndWeight;
-        // prueba = meow;
+
       
     }
 
-    // Weight es la media de los valores del producto escalar de la normal y posicion
-    // prueba = weight;
     temp /= float(numSamples);
     prueba = temp;
 
     ao /= float(numSamples);
-    // ao = clamp(ao, 0.0, 1.0);
     // ao = 1.0 - ao;
-    // pruebaVec = VS_fragPos;
+
     // gl_FragColor = texture2D(textureSampler, vUV);
     gl_FragColor = vec4(ao, ao, ao, 1);
-    gl_FragColor = vec4(pruebaVec, 1);
+    // gl_FragColor = vec4(pruebaVec, 1);
     // gl_FragColor = vec4(depth, depth, depth, 1);
-    gl_FragColor = vec4(prueba, -prueba, 0.0, 1);
+    // gl_FragColor = vec4(prueba, -prueba, 0.0, 1);
     // gl_FragColor = vec4(prueba, prueba, prueba, 1);
     // gl_FragColor = vec4(prueba, offsetNAngleNeg, 0.0, 1);
     // gl_FragColor = texture2D(textureSampler, vUV) - vec4(ao, ao, ao, 0);

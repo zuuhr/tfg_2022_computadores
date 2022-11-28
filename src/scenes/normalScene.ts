@@ -15,7 +15,7 @@ export class NormalScene implements CreateSceneClass {
         var camera = new BABYLON.FreeCamera("camera", new BABYLON.Vector3(1, 0, 1), scene);
         camera.setTarget(new BABYLON.Vector3(0, 0, 0));
         camera.attachControl(canvas);
-        camera.maxZ = 50; //Tweak to see better xd
+        camera.maxZ = 200; //Tweak to see better xd
         camera.minZ = 0.1;
 
         // Make camera orthographic
@@ -62,6 +62,11 @@ export class NormalScene implements CreateSceneClass {
         var sphere = BABYLON.Mesh.CreateSphere("sphere", 5, 20, scene);
         sphere.position = new BABYLON.Vector3(0, 2.5, 20);
         sphere.material = whiteMaterial;
+
+        var sphere2 = BABYLON.Mesh.CreateSphere("sphere", 5, 200, scene);
+        sphere2.flipFaces();
+        sphere2.position = new BABYLON.Vector3(0, 2.5, 20);
+        sphere2.material = whiteMaterial;
 
         var numBoxes = 4;
         for (var i = 0; i < numBoxes; i++) {
@@ -185,7 +190,7 @@ export class NormalScene implements CreateSceneClass {
         // var radius = 0.01;
         var radius = 0.0002;
         //Bias default: 0.025
-        var bias = 0.002;
+        var bias = 0.5;
         //base color of SSAO
         var base = 0.5;
         var kernelSphereData2: number[] = [];
@@ -294,7 +299,7 @@ export class NormalScene implements CreateSceneClass {
         
         
         //SSAO Shader
-        shader = (await fetch("ssao_renderTarget.fragment").then(response => response.text())).toString();
+        shader = (await fetch("ssao.fragment").then(response => response.text())).toString();
         BABYLON.Effect.ShadersStore.ssaoPostProcessFragmentShader = shader;
         
         
