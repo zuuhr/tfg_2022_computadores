@@ -64,10 +64,10 @@ export class NormalScene implements CreateSceneClass {
         sphere.position = new BABYLON.Vector3(0, 2.5, 20);
         sphere.material = whiteMaterial;
 
-        var sphere2 = BABYLON.Mesh.CreateSphere("sphere", 5, 200, scene);
-        sphere2.flipFaces();
-        sphere2.position = new BABYLON.Vector3(0, 2.5, 20);
+        var sphere2 = BABYLON.CreateSphere("sphere2", { segments : 5, diameter : 200 }, scene);
+        sphere2.position = new BABYLON.Vector3(0, 0, 0);
         sphere2.material = whiteMaterial;
+        sphere2.flipFaces(true);
 
         var numBoxes = 4;
         for (var i = 0; i < numBoxes; i++) {
@@ -90,6 +90,7 @@ export class NormalScene implements CreateSceneClass {
         // });
         
         boxes.push(sphere);
+        boxes.push(sphere2);
         boxes.push(planeH);
         boxes.push(planeF);
         boxes.push(planeR);
