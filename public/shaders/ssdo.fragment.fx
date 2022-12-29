@@ -58,7 +58,8 @@ void main(){
     fragN = fragN * 2.0 - 1.0;
 
     //The further the distance the bigger the radius in view space 
-    float scale = 0.01 / VS_fragPos.z; 
+    float aoScale = 0.02 / VS_fragPos.z; 
+    float ssdoScale = 0.07 / VS_fragPos.z; 
 
     float fragL = dot(fragN, dirLight);
 
@@ -66,24 +67,29 @@ void main(){
     float ao = 0.0;
     vec3 ssdo = vec3(0.0, 0.0, 0.0);
     for(int i = 0; i < 16; i++){
-        vec2 sampleCoord = vec[i].xy * scale;
-        vec3 VS_offsetPos = VSPositionFromDepth(vUV + sampleCoord);
-        vec3 offsetN = texture2D(normalTex, vUV + sampleCoord).xyz;
+        vec2 aoSampleCoord = vec[i].xy * aoScale;
+        vec2 ssdoSampleCoord = vec[i].xy * ssdoScale;
+        vec3 VS_offsetPos = VSPositionFromDepth(vUV + aoSampleCoord);
+
+        vec3 offsetN = texture2D(normalTex, vUV + ssdoSampleCoord).xyz;
         offsetN = offsetN * 2.0 - 1.0;
-        float offsetL = dot(offsetN, dirLight);
-        vec3 offsetColor = texture2D(textureSampler, vUV + sampleCoord).xyz;
+        float offsetL = dot(offsetN, -dirLight);
+        vec3 offsetColor = texture2D(textureSampler, vUV + ssdoSampleCoord).xyz;
 
         vec3 diff = VS_offsetPos - VS_fragPos;
-        float dist = VS_offsetPos.z - VS_fragPos.z;
-        // float rangeCheck = (dist <= 0.01)? 1.0 : 0.0;
+        float dist = abs(VS_offsetPos.z - VS_fragPos.z);
+        // dist *= 500.0;
+        dist = dist > 0.0001 ? 1000000.0 : dist;
+        float rangeCheck = (1.0 / (1.0 + dist));
+
         float offsetNAngle =  dot(fragN, normalize(diff));
-        // offsetNAngle = offsetNAngle > 0.9 ? 1.0 : offsetNAngle;
-        ao += offsetNAngle;
+        ao += offsetNAngle * rangeCheck;
         ssdo += (offsetL * offsetColor);
     }
     // ao *= 10.0;
     ao = max(1.0 - (max(0.0, ao)), 0.1);
     ao = ao < 0.92 ? 1.0 : ao;
+    
     
     ssdo /= 16.0;
     ssdo =  max(vec3(0.0, 0.0, 0.0), ssdo);
@@ -91,6 +97,7 @@ void main(){
     vec3 result = min((fragColor  + ssdo), vec3(1.0, 1.0, 1.0)) * ao;
     gl_FragColor = vec4(ssdo, 1);
     gl_FragColor = vec4(result, 1);
+    gl_FragColor = vec4(ssdo, ao);
     // gl_FragColor = vec4(ao, ao, ao, 1);
 
 }

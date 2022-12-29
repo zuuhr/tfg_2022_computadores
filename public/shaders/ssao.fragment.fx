@@ -63,12 +63,15 @@ void main(){
         vec3 VS_offsetPos = VSPositionFromDepth(vUV + sampleCoord);
 
         vec3 diff = VS_offsetPos - VS_fragPos;
-        float dist = length(diff);
-        // float rangeCheck = (1.0 / (1.0 + dist));
+        float dist = abs(VS_offsetPos.z - VS_fragPos.z);
+        // dist *= 500.0;
+        dist = dist > 0.0001 ? 1000000.0 : dist;
+        float rangeCheck = (1.0 / (1.0 + dist));
+        // float rangeCheck = step(0.00, dist) * (1.0 - smoothstep(0.6, 1.0, dist));
         float offsetNAngle =  dot(fragN, normalize(diff));
 
-        // ao += offsetNAngle * rangeCheck;
-        ao += offsetNAngle;
+        ao += offsetNAngle * rangeCheck;
+        // ao += offsetNAngle;
     }
     ao = max(1.0 - (max(0.0, ao)), 0.1);
     ao = ao < 0.92 ? 1.0 : ao;
