@@ -83,8 +83,9 @@ void main(){
         float rangeCheck = (1.0 / (1.0 + dist));
 
         float offsetNAngle =  dot(fragN, normalize(diff));
+        float offsetNAngle2 =  max(dot(fragN, normalize(diff)), 0.0);
         ao += offsetNAngle * rangeCheck;
-        ssdo += ( offsetI * offsetColor);
+        ssdo += offsetNAngle * offsetI * offsetColor;
     }
     // ao *= 10.0;
     ao = max(1.0 - (max(0.0, ao)), 0.1);
