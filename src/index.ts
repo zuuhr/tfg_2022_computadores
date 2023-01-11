@@ -21,15 +21,15 @@ var camera = new FreeCamera("camera1", new Vector3(0, 2, 6), scene);
 camera.setTarget(new Vector3(0, 1.25, 0));
 camera.attachControl(canvas, true);
 
-// This creates a light, aiming 0,1,0 - to the sky (non-mesh)
-var topLight = new HemisphericLight("topLight", new Vector3(0, 1, 0), scene);
-var bottomLight = new HemisphericLight("bottomLight", new Vector3(0, -1, 0), scene);
+// // This creates a light, aiming 0,1,0 - to the sky (non-mesh)
+// var topLight = new HemisphericLight("topLight", new Vector3(0, 1, 0), scene);
+// var bottomLight = new HemisphericLight("bottomLight", new Vector3(0, -1, 0), scene);
 
-// Defaulit intensity s 1. Let's dim the light a small amount
-topLight.intensity = 0.7;
-bottomLight.intensity = 0.7;
+// // Defaulit intensity s 1. Let's dim the light a small amount
+// topLight.intensity = 0.7;
+// bottomLight.intensity = 0.7;
 
-var dirLight = new DirectionalLight("dirLight", new Vector3(-1, -1, 0.5), scene);
+var dirLight = new DirectionalLight("dirLight", new Vector3(-1, -1, -0.5), scene);
 
 // Shadow generator
 const shadowGenerator = new BABYLON.ShadowGenerator(1024, dirLight);
@@ -58,7 +58,7 @@ var passPostProcess = new BABYLON.PassPostProcess("Scene copy", 1.0, camera);
 
 var ssaoPostProcess = new BABYLON.PostProcess(
   'SSAO',
-  "./shaders/ssdo",
+  "./shaders/ssdoDDP",
   ['projection', 'dirLight'],
   ['depthTex', 'normalTex'],
   1.0,

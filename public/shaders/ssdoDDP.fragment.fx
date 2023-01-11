@@ -59,7 +59,7 @@ void main(){
 
     //The further the distance the bigger the radius in view space 
     float aoScale = 0.02 / VS_fragPos.z; 
-    float ssdoScale = 0.05 / VS_fragPos.z; 
+    float ssdoScale = 0.07 / VS_fragPos.z; 
 
     float fragL = dot(fragN, dirLight);
 
@@ -73,8 +73,7 @@ void main(){
 
         vec3 offsetN = texture2D(normalTex, vUV + ssdoSampleCoord).xyz;
         offsetN.z = -offsetN.z;
-        // offsetN = offsetN * 2.0 - 1.0;
-        float offsetL = max(dot(offsetN, -dirLight), 0.0);
+        float offsetI = max(dot(-offsetN, fragN), 0.0);
         vec3 offsetColor = texture2D(textureSampler, vUV + ssdoSampleCoord).xyz;
 
         vec3 diff = VS_offsetPos - VS_fragPos;
@@ -85,7 +84,7 @@ void main(){
 
         float offsetNAngle =  dot(fragN, normalize(diff));
         ao += offsetNAngle * rangeCheck;
-        ssdo += ( offsetL * offsetColor);
+        ssdo += ( offsetI * offsetColor);
     }
     // ao *= 10.0;
     ao = max(1.0 - (max(0.0, ao)), 0.1);
