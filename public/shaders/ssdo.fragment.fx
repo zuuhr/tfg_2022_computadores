@@ -7,6 +7,7 @@ uniform sampler2D normalTex;
 uniform mat4 projection;
 
 uniform vec3 dirLight;
+uniform vec3 pointLight;
 
 in vec2 vUV;
 
@@ -61,7 +62,7 @@ void main(){
     float aoScale = 0.02 / VS_fragPos.z; 
     float ssdoScale = 0.05 / VS_fragPos.z; 
 
-    float fragL = dot(fragN, dirLight);
+    // float fragL = dot(fragN, dirLight);
 
  
     float ao = 0.0;
@@ -74,7 +75,8 @@ void main(){
         vec3 offsetN = texture2D(normalTex, vUV + ssdoSampleCoord).xyz;
         offsetN.z = -offsetN.z;
         // offsetN = offsetN * 2.0 - 1.0;
-        float offsetL = max(dot(offsetN, -dirLight), 0.0);
+        // float offsetL = max(dot(offsetN, -dirLight), 0.0);
+        float offsetL = max(dot(offsetN, normalize(VS_fragPos - pointLight)), 0.0);
         vec3 offsetColor = texture2D(textureSampler, vUV + ssdoSampleCoord).xyz;
 
         vec3 diff = VS_offsetPos - VS_fragPos;
@@ -83,9 +85,9 @@ void main(){
         dist = dist > 0.0001 ? 1000000.0 : dist;
         float rangeCheck = (1.0 / (1.0 + dist));
 
-        float offsetNAngle =  dot(fragN, normalize(diff));
+        float offsetNAngle =  max(dot(fragN, normalize(diff)), 0.0);
         ao += offsetNAngle * rangeCheck;
-        ssdo += ( offsetL * offsetColor);
+        ssdo += (1.0 - ao) * ( offsetL * offsetColor);
     }
     // ao *= 10.0;
     ao = max(1.0 - (max(0.0, ao)), 0.1);

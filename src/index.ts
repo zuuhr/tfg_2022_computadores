@@ -9,7 +9,7 @@ import { SceneLoader } from '@babylonjs/core/Loading/sceneLoader';
 import '@babylonjs/loaders/glTF'
 import * as BABYLON from '@babylonjs/core/Legacy/legacy';
 import { DirectionalLight } from '@babylonjs/core/Lights/directionalLight';
-import { Color3, Mesh, StandardMaterial } from '@babylonjs/core/Legacy/legacy';
+import { Color3, Mesh, PointLight, StandardMaterial } from '@babylonjs/core/Legacy/legacy';
 
 // Get the canvas element from the DOM.
 const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
@@ -29,10 +29,11 @@ camera.attachControl(canvas, true);
 // topLight.intensity = 0.7;
 // bottomLight.intensity = 0.7;
 
-var dirLight = new DirectionalLight("dirLight", new Vector3(-1, -1, -0.5), scene);
+// var dirLight = new DirectionalLight("dirLight", new Vector3(-3, 1, -0.5), scene);
+var pointLight = new PointLight("pointLight", new Vector3(0, 2.8, 0), scene);
 
 // Shadow generator
-const shadowGenerator = new BABYLON.ShadowGenerator(1024, dirLight);
+const shadowGenerator = new BABYLON.ShadowGenerator(1024, pointLight);
 
 var emissiveMat = new StandardMaterial("light", scene);
 emissiveMat.emissiveColor = Color3.White();
@@ -49,6 +50,8 @@ SceneLoader.ImportMesh("", "cornellBox.glb", "", scene, function (meshes, materi
     shadowGenerator.addShadowCaster(element);
     element.receiveShadows = true;
   });
+  // light.000 mesh set to emissive
+  meshes[6].material = emissiveMat;
 });
 
 const geometryBuffer = scene.enableGeometryBufferRenderer();
@@ -70,7 +73,9 @@ ssaoPostProcess.onApply = function (effect) {
   effect.setTexture("depthTex", depthBuffer.getDepthMap());
   effect.setTexture("normalTex", geometryBuffer.getGBuffer().textures[1]);
   effect.setMatrix("projection", scene.getProjectionMatrix());
-  effect.setVector3("dirLight", (Vector3.TransformNormal(dirLight.direction, scene.getViewMatrix())).normalize());
+  // effect.setVector3("dirLight", (Vector3.TransformNormal(dirLight.direction, scene.getViewMatrix())).normalize());
+  effect.setVector3("pointLight", (Vector3.TransformCoordinates(pointLight.position, scene.getViewMatrix())));
+  // effect.setTexture("shadowTex", shadowGenerator.getShadowMap);
 };
 
 var kernel = 32.0;
