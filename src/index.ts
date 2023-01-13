@@ -30,7 +30,8 @@ camera.attachControl(canvas, true);
 // bottomLight.intensity = 0.7;
 
 // var dirLight = new DirectionalLight("dirLight", new Vector3(-3, 1, -0.5), scene);
-var pointLight = new PointLight("pointLight", new Vector3(0, 2.8, 0), scene);
+// var pointLight = new PointLight("pointLight", new Vector3(0, 2.8, 0), scene);
+var pointLight = new PointLight("pointLight", new Vector3(0, 1.4, 1), scene);
 
 // Shadow generator
 const shadowGenerator = new BABYLON.ShadowGenerator(1024, pointLight);
