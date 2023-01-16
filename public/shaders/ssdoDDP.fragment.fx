@@ -6,8 +6,15 @@ uniform sampler2D normalTex;
 
 uniform mat4 projection;
 
-uniform vec3 dirLight;
 uniform vec3 pointLight;
+uniform vec3 lightColor;
+
+uniform float aoRadius;
+uniform float ssdoRadius;
+uniform float ssdoIntensity;
+uniform float aoIntensity;
+uniform int numSamples;
+uniform vec3 kernelSphere[16]; //SAME AS numSamples
 
 in vec2 vUV;
 
@@ -33,24 +40,6 @@ vec3 VSPositionFromDepth(vec2 texCoord)
 
 void main(){
 
-    vec[0] = vec2(1,0);
-    vec[1] = vec2(-1,0);
-    vec[2] = vec2(0,1);
-    vec[3] = vec2(0,-1);
-    vec[4] = vec2(0.707, 0.707);
-    vec[5] = vec2(-0.707, 0.707);
-    vec[6] = vec2(-0.707, -0.707);
-    vec[7] = vec2(0.707, -0.707);
-
-    vec[8] = vec2(0.25, 0.3);
-    vec[9] = vec2(0.25, -0.3);
-    vec[10] = vec2(-0.25, -0.3);
-    vec[11] = vec2(-0.25, 0.3);
-    vec[12] = vec2(0.5, 0.1);
-    vec[13] = vec2(0.5, -0.1);
-    vec[14] = vec2(-0.5, -0.1);
-    vec[15] = vec2(-0.5, 0.1);
-
     vec3 fragColor = texture2D(textureSampler, vUV).xyz;
     vec3 VS_fragPos = VSPositionFromDepth(vUV);
     
@@ -58,18 +47,18 @@ void main(){
     vec3 fragN = texture2D(normalTex, vUV).xyz;
 
     //The further the distance the bigger the radius in view space 
-    float aoScale = 0.1 / VS_fragPos.z; 
-    float ssdoScale = 0.1 / VS_fragPos.z; 
+    float aoScale = aoRadius / VS_fragPos.z; 
+    float ssdoScale = ssdoRadius / VS_fragPos.z; 
  
     float ao = 0.0;
     vec3 ssdo = vec3(0.0, 0.0, 0.0);
-    for(int i = 0; i < 16; i++){
-        vec2 aoSampleCoord = vec[i].xy * aoScale;
-        vec2 ssdoSampleCoord = vec[i].xy * ssdoScale;
+    for(int i = 0; i < numSamples; i++){
+        vec2 aoSampleCoord = kernelSphere[i].xy * aoScale;
+        vec2 ssdoSampleCoord = kernelSphere[i].xy * ssdoScale;
         vec3 VS_offsetPos = VSPositionFromDepth(vUV + aoSampleCoord);
 
         vec3 offsetN = texture2D(normalTex, vUV + ssdoSampleCoord).xyz;
-        vec3 offsetColor = texture2D(textureSampler, vUV + ssdoSampleCoord).xyz;
+        vec3 offsetColor = (texture2D(textureSampler, vUV + ssdoSampleCoord).xyz + lightColor) * lightColor;
 
         vec3 diff = VS_offsetPos - VS_fragPos;
         float dist = abs(VS_offsetPos.z - VS_fragPos.z);
@@ -77,19 +66,15 @@ void main(){
         // dist = dist > 0.0001 ? 1000000.0 : dist;
         float rangeCheck = (1.0 / (1.0 + dist));
 
-        float offsetNAngle = max(dot(offsetN, -normalize(diff)), 0.0);
-        float fragNAngle =  max(dot(fragN, normalize(diff)), 0.0);
+        float offsetNAngle = clamp(dot(offsetN, -normalize(diff)), 0.0, 1.0);
+        float fragNAngle =  clamp(dot(fragN, normalize(diff)), 0.0, 1.0);
 
         ao += fragNAngle * rangeCheck;
-
-        // ssdo += (1.0 - ao) * fragNAngle * offsetNAngle * offsetColor;
-        ssdo +=  offsetNAngle * fragNAngle * offsetColor * rangeCheck;
+        ssdo += offsetNAngle * fragNAngle * offsetColor * rangeCheck * ssdoIntensity;
     }
-
     ao /= 16.0;
-    // ssdo /= 16.0;
+    ao = 1.0 - (ao * ao * aoIntensity);
+    ssdo = fragColor * ssdo / 16.0;
 
-    // gl_FragColor = vec4(ssdo,  ao);
-    gl_FragColor = vec4(ssdo,  1);
-
+    gl_FragColor = vec4(ssdo,  ao);
 }
