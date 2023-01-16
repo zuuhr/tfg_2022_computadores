@@ -51,7 +51,6 @@ void main(){
     vec[14] = vec2(-0.5, -0.1);
     vec[15] = vec2(-0.5, 0.1);
 
-    // vec3 dirLight = vec3(0, -1.0, -0.5); 
     vec3 fragColor = texture2D(textureSampler, vUV).xyz;
     vec3 VS_fragPos = VSPositionFromDepth(vUV);
     
@@ -60,11 +59,7 @@ void main(){
 
     //The further the distance the bigger the radius in view space 
     float aoScale = 0.1 / VS_fragPos.z; 
-    float ssdoScale = 0.2 / VS_fragPos.z; 
-
-    // float fragL = dot(fragN, dirLight);
-
-
+    float ssdoScale = 0.1 / VS_fragPos.z; 
  
     float ao = 0.0;
     vec3 ssdo = vec3(0.0, 0.0, 0.0);
@@ -74,26 +69,24 @@ void main(){
         vec3 VS_offsetPos = VSPositionFromDepth(vUV + aoSampleCoord);
 
         vec3 offsetN = texture2D(normalTex, vUV + ssdoSampleCoord).xyz;
-        float offsetI = max(dot(-offsetN, fragN), 0.0);
         vec3 offsetColor = texture2D(textureSampler, vUV + ssdoSampleCoord).xyz;
 
         vec3 diff = VS_offsetPos - VS_fragPos;
         float dist = abs(VS_offsetPos.z - VS_fragPos.z);
-        // dist *= 500.0;
-        dist = dist > 0.0001 ? 1000000.0 : dist;
+        dist *= 50000.0;
+        // dist = dist > 0.0001 ? 1000000.0 : dist;
         float rangeCheck = (1.0 / (1.0 + dist));
 
-        float offsetNAngle =  dot(fragN, normalize(diff));
-        // LA SIGUIENTE LINEA DE CÓDIGO DA PROBLEMAS
-        float offsetNAngle2 =  max(dot(fragN, normalize(diff)), 0.0);
+        float offsetNAngle = max(dot(offsetN, -normalize(diff)), 0.0);
+        float fragNAngle =  max(dot(fragN, normalize(diff)), 0.0);
 
-        ao += offsetNAngle2 * rangeCheck;
+        ao += fragNAngle * rangeCheck;
 
-        // ssdo += (1.0 - ao) * offsetNAngle * offsetI * offsetColor;
-        ssdo += offsetNAngle2 *  offsetColor ;
+        // ssdo += (1.0 - ao) * fragNAngle * offsetNAngle * offsetColor;
+        ssdo +=  offsetNAngle * fragNAngle * offsetColor * rangeCheck;
     }
 
-    // ao /= 16.0;
+    ao /= 16.0;
     // ssdo /= 16.0;
 
     // gl_FragColor = vec4(ssdo,  ao);
