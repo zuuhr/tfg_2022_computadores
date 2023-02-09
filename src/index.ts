@@ -45,6 +45,8 @@ SceneLoader.ImportMesh("", "cornellBox.glb", "", scene, function (meshes, materi
   meshes[6].material = emissiveMat;
 });
 
+// SceneLoader.ImportMesh("", "viking.glb", "", scene);
+
 var noiseTexture = new BABYLON.Texture("Noise.png", scene, false, false, 1);
 noiseTexture.wrapU = BABYLON.Texture.WRAP_ADDRESSMODE;
 noiseTexture.wrapV = BABYLON.Texture.WRAP_ADDRESSMODE;
@@ -104,9 +106,51 @@ ssaoPostProcess.onApply = function (effect) {
   effect.setVector3("lightColor", new Vector3(lightColor.r, lightColor.g, lightColor.b));
 };
 
-var kernel = 0.0;
-var HBlurPostProcess = new BABYLON.BlurPostProcess("Horizontal blur", new BABYLON.Vector2(1.0, 0), kernel, 1.0, camera);
-var VBlurPostProcess = new BABYLON.BlurPostProcess("Vertical blur", new BABYLON.Vector2(0, 1.0), kernel, 1.0, camera);
+// var cocBlur = new BABYLON.CircleOfConfusionPostProcess("COC BLUR", depthBuffer.getDepthMap(), 1, camera );
+// cocBlur.focusDistance = 0.5;
+// cocBlur.onApply = function {
+
+// }
+var kernel = 32.0;
+// var dofBlur = new BABYLON.DepthOfFieldBlurPostProcess("DOF BLUR", scene,new BABYLON.Vector2(0, 0), kernel, 1, camera, cocBlur );
+// var HBlurPostProcess = new BABYLON.BlurPostProcess("Horizontal blur", new BABYLON.Vector2(1.0, 0), kernel, 1.0, camera);
+// var VBlurPostProcess = new BABYLON.BlurPostProcess("Vertical blur", new BABYLON.Vector2(0, 1.0), kernel, 1.0, camera);
+
+// Default = 1.0
+var blurWidth = 4.0;
+var screenSize = new BABYLON.Vector2(1.0 / canvas.width, 1.0 / canvas.height);
+
+var HGaussianBlurPostProcess = new BABYLON.PostProcess(
+  'Horizontal Gaussian Blur',
+  "./shaders/gaussianBlur",
+  ["screenSize", "direction", "blurWidth"],
+  [],
+  1.0,
+  camera
+);
+
+HGaussianBlurPostProcess.onApply = function (effect) {
+  effect.setVector2("screenSize", screenSize);
+  effect.setVector2("direction", new BABYLON.Vector2(1, 0));
+  effect.setFloat("blurWidth", blurWidth);
+  effect.setTexture("depthTex", depthBuffer.getDepthMap());
+};
+
+var VGaussianBlurPostProcess = new BABYLON.PostProcess(
+  'Horizontal Gaussian Blur',
+  "./shaders/gaussianBlur",
+  ["screenSize", "direction", "blurWidth"],
+  [],
+  1.0,
+  camera
+  );
+  
+  VGaussianBlurPostProcess.onApply = function (effect) {
+    effect.setVector2("screenSize", screenSize);
+    effect.setVector2("direction", new BABYLON.Vector2(0, 1));
+    effect.setFloat("blurWidth", blurWidth);
+    effect.setTexture("depthTex", depthBuffer.getDepthMap());
+};
 
 var combinePostProcess = new BABYLON.PostProcess(
   'Combine',
@@ -118,7 +162,7 @@ var combinePostProcess = new BABYLON.PostProcess(
 );
 
 combinePostProcess.onApply = function (effect) {
-  effect.setTextureFromPostProcessOutput("ssdoTex", VBlurPostProcess);
+  effect.setTextureFromPostProcessOutput("ssdoTex", VGaussianBlurPostProcess);
   effect.setTextureFromPostProcessOutput("textureSampler", passPostProcess);
 };
 
