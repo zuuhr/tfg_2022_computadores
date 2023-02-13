@@ -7,7 +7,7 @@ import '@babylonjs/core/Materials/standardMaterial';
 import { SceneLoader } from '@babylonjs/core/Loading/sceneLoader';
 import '@babylonjs/loaders/glTF'
 import * as BABYLON from '@babylonjs/core/Legacy/legacy';
-import { Color3, Effect, Mesh, PointLight, StandardMaterial } from '@babylonjs/core/Legacy/legacy';
+import { Color3, Effect, Mesh, PointLight, PostProcess, SpotLight, StandardMaterial } from '@babylonjs/core/Legacy/legacy';
 
 // Get the canvas element from the DOM.
 const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
@@ -20,7 +20,9 @@ camera.setTarget(new Vector3(0, 1.25, 0));
 camera.attachControl(canvas, true);
 
 var pointLight = new PointLight("pointLight", new Vector3(0, 2.8, 0), scene);
+// var pointLight = new SpotLight("pointLight", new Vector3(0, 1.4, 0), new Vector3(1, 0, 0), 90, 1, scene);
 var lightColor = new Color3(1.0, 1.0, 1.0);
+// pointLight.intensity = 10;
 pointLight.diffuse = lightColor;
 
 // Shadow generator
@@ -45,7 +47,7 @@ SceneLoader.ImportMesh("", "cornellBox.glb", "", scene, function (meshes, materi
   meshes[6].material = emissiveMat;
 });
 
-// SceneLoader.ImportMesh("", "viking.glb", "", scene);
+
 
 var noiseTexture = new BABYLON.Texture("Noise.png", scene, false, false, 1);
 noiseTexture.wrapU = BABYLON.Texture.WRAP_ADDRESSMODE;
@@ -98,10 +100,10 @@ ssaoPostProcess.onApply = function (effect) {
   effect.setMatrix("projection", scene.getProjectionMatrix());
   effect.setInt("numSamples", numSamples);
   effect.setArray3("kernelSphere", kernelSphere);
-  effect.setFloat("aoRadius", 0.1);
-  effect.setFloat("ssdoRadius", 0.4);
-  effect.setFloat("aoIntensity", 1.0);
-  effect.setFloat("ssdoIntensity", 5.0);
+  effect.setFloat("aoRadius", 0.3);
+  effect.setFloat("ssdoRadius", 2.0);
+  effect.setFloat("aoIntensity", 20.0);
+  effect.setFloat("ssdoIntensity", 20.0);
   effect.setVector3("pointLight", (Vector3.TransformCoordinates(pointLight.position, scene.getViewMatrix())));
   effect.setVector3("lightColor", new Vector3(lightColor.r, lightColor.g, lightColor.b));
 };
@@ -117,7 +119,7 @@ var kernel = 32.0;
 // var VBlurPostProcess = new BABYLON.BlurPostProcess("Vertical blur", new BABYLON.Vector2(0, 1.0), kernel, 1.0, camera);
 
 // Default = 1.0
-var blurWidth = 4.0;
+var blurWidth = 1.0;
 var screenSize = new BABYLON.Vector2(1.0 / canvas.width, 1.0 / canvas.height);
 
 var HGaussianBlurPostProcess = new BABYLON.PostProcess(
@@ -126,7 +128,10 @@ var HGaussianBlurPostProcess = new BABYLON.PostProcess(
   ["screenSize", "direction", "blurWidth"],
   [],
   1.0,
-  camera
+  camera,
+  0,
+  engine,
+  true
 );
 
 HGaussianBlurPostProcess.onApply = function (effect) {
@@ -142,7 +147,10 @@ var VGaussianBlurPostProcess = new BABYLON.PostProcess(
   ["screenSize", "direction", "blurWidth"],
   [],
   1.0,
-  camera
+  camera, 
+  0,
+  engine,
+  true
   );
   
   VGaussianBlurPostProcess.onApply = function (effect) {
@@ -151,6 +159,95 @@ var VGaussianBlurPostProcess = new BABYLON.PostProcess(
     effect.setFloat("blurWidth", blurWidth);
     effect.setTexture("depthTex", depthBuffer.getDepthMap());
 };
+
+var H2GaussianBlurPostProcess = new BABYLON.PostProcess(
+  'Horizontal Gaussian Blur',
+  "./shaders/gaussianBlur",
+  ["screenSize", "direction", "blurWidth"],
+  [],
+  1.0,
+  camera,
+  0,
+  engine,
+  true
+);
+
+H2GaussianBlurPostProcess.onApply = function (effect) {
+  effect.setVector2("screenSize", screenSize);
+  effect.setVector2("direction", new BABYLON.Vector2(1, 0));
+  effect.setFloat("blurWidth", blurWidth);
+  effect.setTexture("depthTex", depthBuffer.getDepthMap());
+};
+
+var V2GaussianBlurPostProcess = new BABYLON.PostProcess(
+  'Horizontal Gaussian Blur',
+  "./shaders/gaussianBlur",
+  ["screenSize", "direction", "blurWidth"],
+  [],
+  1.0,
+  camera, 
+  0,
+  engine,
+  true
+  );
+  
+  V2GaussianBlurPostProcess.onApply = function (effect) {
+    effect.setVector2("screenSize", screenSize);
+    effect.setVector2("direction", new BABYLON.Vector2(0, 1));
+    effect.setFloat("blurWidth", blurWidth);
+    effect.setTexture("depthTex", depthBuffer.getDepthMap());
+};
+
+var H3GaussianBlurPostProcess = new BABYLON.PostProcess(
+  'Horizontal Gaussian Blur',
+  "./shaders/gaussianBlur",
+  ["screenSize", "direction", "blurWidth"],
+  [],
+  1.0,
+  camera,
+  0,
+  engine,
+  true
+);
+
+H3GaussianBlurPostProcess.onApply = function (effect) {
+  effect.setVector2("screenSize", screenSize);
+  effect.setVector2("direction", new BABYLON.Vector2(1, 0));
+  effect.setFloat("blurWidth", blurWidth);
+  effect.setTexture("depthTex", depthBuffer.getDepthMap());
+};
+
+var V3GaussianBlurPostProcess = new BABYLON.PostProcess(
+  'Horizontal Gaussian Blur',
+  "./shaders/gaussianBlur",
+  ["screenSize", "direction", "blurWidth"],
+  [],
+  1.0,
+  camera, 
+  0,
+  engine,
+  true
+  );
+  
+  V3GaussianBlurPostProcess.onApply = function (effect) {
+    effect.setVector2("screenSize", screenSize);
+    effect.setVector2("direction", new BABYLON.Vector2(0, 1));
+    effect.setFloat("blurWidth", blurWidth);
+    effect.setTexture("depthTex", depthBuffer.getDepthMap());
+};
+
+
+
+
+// VGaussianBlurPostProcess.apply();
+// HGaussianBlurPostProcess.apply();
+// var finalBlur = VGaussianBlurPostProcess.clone();
+// finalBlur.onApply = function (effect) {
+//   effect.setVector2("screenSize", screenSize);
+//   effect.setVector2("direction", new BABYLON.Vector2(0, 1));
+//   effect.setFloat("blurWidth", blurWidth);
+//   effect.setTexture("depthTex", depthBuffer.getDepthMap());
+// };
 
 var combinePostProcess = new BABYLON.PostProcess(
   'Combine',
@@ -162,7 +259,7 @@ var combinePostProcess = new BABYLON.PostProcess(
 );
 
 combinePostProcess.onApply = function (effect) {
-  effect.setTextureFromPostProcessOutput("ssdoTex", VGaussianBlurPostProcess);
+  effect.setTextureFromPostProcessOutput("ssdoTex", V3GaussianBlurPostProcess);
   effect.setTextureFromPostProcessOutput("textureSampler", passPostProcess);
 };
 

@@ -15,8 +15,9 @@ void main(){
     // gl_FragColor = (vec4(0.5, 0.5, 0.5, 0.0) + vec4(ssdo, 1)) * ao;
     //La energía se suma
     gl_FragColor = vec4((baseColor + ssdo) * ao, 1.0);
-    gl_FragColor = vec4((vec3(0.5) + ssdo) * ao, 1.0);
-    gl_FragColor = vec4(ssdo, 1.0);
+    // gl_FragColor = vec4((vec3(0.5) + ssdo) * ao, 1.0);
+    gl_FragColor = vec4((vec3(0.5) ) * ao, 1.0);
+    // gl_FragColor = vec4(ssdo, 1.0);
     // gl_FragColor = vec4(min((baseColor  + ssdo), vec3(1.0, 1.0, 1.0)), 1.0);
     // gl_FragColor = vec4(baseColor * ao, 1.0);
     // gl_FragColor = vec4(baseColor, 1.0);
